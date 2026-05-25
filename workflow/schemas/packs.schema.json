@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/packs.schema.json",
+  "title": "myRA Workflow Packs",
+  "type": "object",
+  "required": [
+    "resolutionOrder",
+    "globalDefaults",
+    "personaPacks",
+    "cadencePacks",
+    "channelPacks",
+    "customization"
+  ],
+  "properties": {
+    "resolutionOrder": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 4
+    },
+    "globalDefaults": {
+      "type": "object",
+      "required": ["personaPack", "cadencePack", "channelPack"],
+      "properties": {
+        "personaPack": { "type": "string" },
+        "cadencePack": { "type": "string" },
+        "channelPack": { "type": "string" }
+      }
+    },
+    "personaPacks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "roleBuckets", "useWhen"],
+        "properties": {
+          "label": { "type": "string" },
+          "roleBuckets": { "type": "array", "items": { "type": "string" } },
+          "useWhen": { "type": "string" }
+        }
+      }
+    },
+    "cadencePacks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "durationBusinessDays", "steps"],
+        "properties": {
+          "label": { "type": "string" },
+          "durationBusinessDays": { "type": "integer", "minimum": 1 },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["day", "channel", "purpose"],
+              "properties": {
+                "day": { "type": "integer", "minimum": 0 },
+                "channel": { "type": "string" },
+                "purpose": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "channelPacks": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["label", "allowedChannels", "manualOnlyChannels"],
+        "properties": {
+          "label": { "type": "string" },
+          "allowedChannels": { "type": "array", "items": { "type": "string" } },
+          "manualOnlyChannels": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "customization": {
+      "type": "object",
+      "required": ["allowed", "guardrailsCannotOverride"],
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string" } },
+        "guardrailsCannotOverride": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
+

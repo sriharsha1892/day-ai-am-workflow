@@ -1,0 +1,107 @@
+lifecycle_stages:
+  - Researching
+  - Contacts Mapped
+  - Outreach Active
+  - Demo Scheduled
+  - Demo Done
+  - Trial Active
+  - Trial Follow-up
+  - Negotiation
+  - Won
+  - Lost
+  - Nurture
+
+icp_role_buckets:
+  - Strategy
+  - Market Intelligence
+  - Insights/Research
+  - Innovation
+  - Corporate Development
+  - Procurement
+  - Business Unit Leader
+
+myra_positioning:
+  core_frame: "decision-grade intelligence for complex B2B research and growth decisions"
+  proof_points:
+    - expert-validated research
+    - market intelligence
+    - competitive intelligence
+    - customer acquisition intelligence
+    - supplier intelligence
+    - trend analysis
+    - internal data integrations
+    - accountable research outputs
+
+approval_policy:
+  auto_allowed:
+    - create account intake shell
+    - create research context
+    - create account plan page
+    - create Day AI tasks
+    - create Day AI email drafts
+    - create account health snapshot
+  approval_required:
+    - external send
+    - canonical contact creation
+    - lifecycle stage change after intake
+    - future calendar event creation
+
+freshsales:
+  mode: read_only
+  matching: evidence_based
+  count_activity_in_day_ai_ledger: false
+
+pack_resolution:
+  config_file: workflow/config/packs.json
+  order:
+    - global defaults
+    - Day AI AM profile context
+    - Day AI account context
+    - ask AM once
+  save_account_choice_to_day_ai: true
+  update_am_profile_only_when_requested: true
+
+guardrailed_customization:
+  am_can_customize:
+    - persona pack
+    - cadence pack
+    - channel pack
+    - tone
+    - CTA
+    - length
+    - freeform instructions
+  cannot_override:
+    - approval before external sends
+    - approval before canonical contact creation
+    - approval before lifecycle changes after intake
+    - Freshsales read-only mode
+    - no calendar write in v1
+    - Day AI ledger-only outreach metrics
+
+cadence_defaults:
+  new_contact:
+    duration_business_days: 15
+    email_touches: 3
+    call_tasks: 1
+    linkedin_tasks: optional
+    whatsapp_tasks: optional
+  existing_contact:
+    duration_business_days: 21
+    email_touches: 2
+    call_tasks: 1
+    linkedin_tasks: optional
+    whatsapp_tasks: optional
+  demo_followup:
+    steps:
+      - same-day recap
+      - two-day value follow-up
+      - five-day stakeholder check
+      - next-step confirmation
+  trial_followup:
+    steps:
+      - day 0 access confirmation
+      - day 2 setup check
+      - day 5 usage check
+      - day 10 value review
+      - day 14 conversion path
+      - day 21 negotiation or nurture decision

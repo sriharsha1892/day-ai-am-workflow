@@ -1,0 +1,3 @@
+am_email,am_name,account_name,domain,aliases,parent_company,priority,persona_pack,cadence_pack,channel_pack,notes
+satya@example.com,Satya,Example Account,example.com,"Example Inc; Example Group",,High,balanced,new-contact-standard,email-call,Sample row; replace before use
+

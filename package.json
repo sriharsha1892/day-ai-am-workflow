@@ -1,0 +1,17 @@
+{
+  "name": "myra-day-ai-am-workflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "myRA AM workflow standardization pack for Codex, Day AI, and Freshsales.",
+  "type": "module",
+  "scripts": {
+    "setup:codex": "node scripts/setup-codex.mjs",
+    "doctor:codex": "node scripts/check-codex-setup.mjs",
+    "validate:roster": "node scripts/validate-am-roster.mjs templates/am-roster.csv",
+    "validate:packs": "node scripts/validate-workflow-packs.mjs workflow/config/packs.json",
+    "validate:assignments": "node scripts/validate-account-assignments.mjs templates/am-account-assignments.csv",
+    "validate:trial-import": "node scripts/validate-trial-import.mjs templates/trial-usage-import.csv",
+    "provision:assignments:preview": "node scripts/prepare-account-provisioning.mjs templates/am-account-assignments.csv",
+    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:assignments && npm run validate:trial-import"
+  }
+}

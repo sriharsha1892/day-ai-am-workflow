@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/account-motion.schema.json",
+  "title": "myRA Account Motion",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["account", "lifecycle", "contacts", "ledger"],
+  "properties": {
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "domain"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "domain": { "type": "string", "pattern": "^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "parentCompany": { "type": "string" },
+        "dayAiOrganizationId": { "type": "string" },
+        "dayAiOpportunityId": { "type": "string" },
+        "freshsalesEvidence": { "$ref": "#/$defs/evidenceList" }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage"],
+      "properties": {
+        "stage": {
+          "enum": [
+            "Researching",
+            "Contacts Mapped",
+            "Outreach Active",
+            "Demo Scheduled",
+            "Demo Done",
+            "Trial Active",
+            "Trial Follow-up",
+            "Negotiation",
+            "Won",
+            "Lost",
+            "Nurture"
+          ]
+        },
+        "stageReason": { "type": "string" },
+        "nextBestAction": { "type": "string" },
+        "ownerEmail": { "type": "string", "format": "email" }
+      }
+    },
+    "research": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "organizationStructure": { "type": "string" },
+        "myraUseCases": { "type": "array", "items": { "type": "string" } },
+        "signals": { "type": "array", "items": { "$ref": "#/$defs/signal" } },
+        "buyerHypothesis": { "type": "string" },
+        "sourceUrls": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "packs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "personaPack": { "type": "string" },
+        "cadencePack": { "type": "string" },
+        "channelPack": { "type": "string" },
+        "tone": { "type": "string" },
+        "cta": { "type": "string" },
+        "length": { "type": "string" },
+        "freeformInstructions": { "type": "string" },
+        "source": {
+          "enum": ["globalDefault", "dayAiAmProfileContext", "dayAiAccountContext", "amDialog", "provisioning"]
+        },
+        "savedToDayAiAccountContext": { "type": "boolean" },
+        "amProfileUpdateRequested": { "type": "boolean" }
+      }
+    },
+    "contacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/contact" }
+    },
+    "ledger": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ledgerEntry" }
+    },
+    "trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trialStatus": { "type": "string" },
+        "trialStartDate": { "type": "string" },
+        "usersInvited": { "type": "integer", "minimum": 0 },
+        "activeUsers7d": { "type": "integer", "minimum": 0 },
+        "researchRuns": { "type": "integer", "minimum": 0 },
+        "exports": { "type": "integer", "minimum": 0 },
+        "shares": { "type": "integer", "minimum": 0 },
+        "lastActivityAt": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "evidenceList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "value"],
+        "properties": {
+          "source": { "type": "string" },
+          "value": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "summary", "myraRelevance"],
+      "properties": {
+        "type": { "type": "string" },
+        "summary": { "type": "string" },
+        "myraRelevance": { "type": "string" },
+        "sourceUrl": { "type": "string" }
+      }
+    },
+    "contact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["email", "selectedByAm"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "roleBucket": { "type": "string" },
+        "selectedByAm": { "type": "boolean" },
+        "dayAiPersonId": { "type": "string" },
+        "freshsalesIds": { "type": "array", "items": { "type": "string" } },
+        "dedupeConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "$ref": "#/$defs/evidenceList" }
+      }
+    },
+    "ledgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "channel", "summary"],
+      "properties": {
+        "timestamp": { "type": "string" },
+        "channel": { "enum": ["email", "call", "linkedin", "whatsapp", "demo", "trial", "internal"] },
+        "contactEmail": { "type": "string", "format": "email" },
+        "summary": { "type": "string" },
+        "outcome": { "type": "string" },
+        "nextStep": { "type": "string" },
+        "dayAiActionId": { "type": "string" }
+      }
+    }
+  }
+}

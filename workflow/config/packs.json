@@ -1,0 +1,127 @@
+{
+  "$schema": "../schemas/packs.schema.json",
+  "resolutionOrder": [
+    "globalDefaults",
+    "dayAiAmProfileContext",
+    "dayAiAccountContext",
+    "askAmOnce"
+  ],
+  "globalDefaults": {
+    "personaPack": "balanced",
+    "cadencePack": "new-contact-standard",
+    "channelPack": "email-call"
+  },
+  "personaPacks": {
+    "strategy-led": {
+      "label": "Strategy-led",
+      "roleBuckets": [
+        "Strategy",
+        "Corporate Development",
+        "Business Unit Leader"
+      ],
+      "useWhen": "The account thesis is tied to strategic planning, market entry, M&A, growth bets, or executive decision support."
+    },
+    "insights-led": {
+      "label": "Insights-led",
+      "roleBuckets": [
+        "Market Intelligence",
+        "Insights/Research",
+        "Innovation"
+      ],
+      "useWhen": "The account thesis is tied to research, competitive intelligence, customer insights, trend analysis, or innovation teams."
+    },
+    "procurement-led": {
+      "label": "Procurement-led",
+      "roleBuckets": [
+        "Procurement",
+        "Business Unit Leader",
+        "Strategy"
+      ],
+      "useWhen": "The account thesis is tied to supplier intelligence, vendor evaluation, sourcing, or procurement transformation."
+    },
+    "balanced": {
+      "label": "Balanced",
+      "roleBuckets": [
+        "Strategy",
+        "Market Intelligence",
+        "Insights/Research",
+        "Innovation",
+        "Corporate Development",
+        "Procurement",
+        "Business Unit Leader"
+      ],
+      "useWhen": "Default when the account motion is early or the best buyer path is not yet clear."
+    }
+  },
+  "cadencePacks": {
+    "new-contact-standard": {
+      "label": "New contact standard",
+      "durationBusinessDays": 15,
+      "steps": [
+        { "day": 0, "channel": "email", "purpose": "Research-led opener" },
+        { "day": 3, "channel": "call", "purpose": "Freshcaller/manual call task" },
+        { "day": 6, "channel": "email", "purpose": "Use-case follow-up" },
+        { "day": 12, "channel": "email", "purpose": "Breakup or next-step ask" }
+      ]
+    },
+    "existing-contact-warm": {
+      "label": "Existing contact warm",
+      "durationBusinessDays": 21,
+      "steps": [
+        { "day": 0, "channel": "email", "purpose": "Contextual re-open" },
+        { "day": 5, "channel": "call", "purpose": "Relationship check-in task" },
+        { "day": 12, "channel": "email", "purpose": "Product/use-case update" },
+        { "day": 21, "channel": "email", "purpose": "Nurture or next-step decision" }
+      ]
+    },
+    "trial-followup": {
+      "label": "Trial follow-up",
+      "durationBusinessDays": 21,
+      "steps": [
+        { "day": 0, "channel": "email", "purpose": "Access confirmation" },
+        { "day": 2, "channel": "email", "purpose": "Setup check" },
+        { "day": 5, "channel": "call", "purpose": "Usage check task" },
+        { "day": 10, "channel": "email", "purpose": "Value review" },
+        { "day": 14, "channel": "email", "purpose": "Conversion path" },
+        { "day": 21, "channel": "email", "purpose": "Negotiation or nurture decision" }
+      ]
+    }
+  },
+  "channelPacks": {
+    "email-only": {
+      "label": "Email only",
+      "allowedChannels": ["email"],
+      "manualOnlyChannels": ["call", "linkedin", "whatsapp"]
+    },
+    "email-call": {
+      "label": "Email + call",
+      "allowedChannels": ["email", "call"],
+      "manualOnlyChannels": ["linkedin", "whatsapp"]
+    },
+    "email-call-linkedin-manual": {
+      "label": "Email + call + manual LinkedIn",
+      "allowedChannels": ["email", "call", "linkedin"],
+      "manualOnlyChannels": ["linkedin", "whatsapp"]
+    }
+  },
+  "customization": {
+    "allowed": [
+      "personaPack",
+      "cadencePack",
+      "channelPack",
+      "tone",
+      "cta",
+      "length",
+      "freeformInstructions"
+    ],
+    "guardrailsCannotOverride": [
+      "approvalRequiredForExternalSends",
+      "approvalRequiredForCanonicalContactCreation",
+      "approvalRequiredForLifecycleStageChangeAfterIntake",
+      "freshsalesReadOnly",
+      "noCalendarWriteInV1",
+      "dayAiLedgerOnlyForOutreachMetrics"
+    ]
+  }
+}
+

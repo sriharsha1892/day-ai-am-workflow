@@ -1,0 +1,3 @@
+account_domain,account_name,trial_start_date,trial_status,users_invited,active_users_7d,research_runs,exports,shares,last_activity_at,notes
+example.com,Example Account,2026-05-25,Trial Active,5,3,12,2,1,2026-05-25T09:00:00Z,Sample row; replace before use
+

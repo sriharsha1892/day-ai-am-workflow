@@ -12,6 +12,7 @@
     "validate:assignments": "node scripts/validate-account-assignments.mjs templates/am-account-assignments.csv",
     "validate:trial-import": "node scripts/validate-trial-import.mjs templates/trial-usage-import.csv",
     "provision:assignments:preview": "node scripts/prepare-account-provisioning.mjs templates/am-account-assignments.csv",
+    "freshsales:probe": "node scripts/freshsales-probe.mjs",
     "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:assignments && npm run validate:trial-import"
   }
 }

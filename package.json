@@ -11,6 +11,7 @@
     "validate:packs": "node scripts/validate-workflow-packs.mjs workflow/config/packs.json",
     "validate:account-seeds": "node scripts/validate-account-seed-list.mjs templates/am-account-seed-list.csv",
     "validate:satya-ready": "node scripts/validate-ready-account-packet.mjs templates/satya-ready-accounts.csv satya@ask-myra.ai 25",
+    "validate:active-contacts": "node scripts/validate-active-contacts.mjs templates/am-active-contacts.csv",
     "validate:assignments": "node scripts/validate-account-assignments.mjs templates/am-account-assignments.csv",
     "validate:trial-import": "node scripts/validate-trial-import.mjs templates/trial-usage-import.csv",
     "provision:assignments:preview": "node scripts/prepare-account-provisioning.mjs templates/am-account-assignments.csv",
@@ -22,6 +23,6 @@
     "freshsales:probe": "node scripts/freshsales-probe.mjs",
     "apollo:probe": "node scripts/apollo-probe.mjs",
     "clearout:probe": "node scripts/clearout-probe.mjs",
-    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:assignments && npm run validate:trial-import"
+    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import"
   }
 }

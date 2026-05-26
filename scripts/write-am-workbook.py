@@ -24,6 +24,7 @@ packet_path = Path(sys.argv[1])
 output_path = Path(sys.argv[2])
 packet = json.loads(packet_path.read_text())
 accounts = packet["accounts"]
+active_contacts = packet.get("activeContacts", [])
 am = packet["am"]
 summary = packet["summary"]
 
@@ -204,6 +205,49 @@ for row_index, row in enumerate(help_rows, 4):
         help_sheet.cell(row=row_index, column=col, value=value)
 style_table(help_sheet, 3, len(help_rows) + 3, 1, 2)
 set_widths(help_sheet, [34, 64])
+
+contacts_sheet = wb.create_sheet("Active Contacts")
+title_cell(contacts_sheet, "A1", "Imported Active Contacts")
+contact_headers = [
+    "Account",
+    "Domain",
+    "Contact",
+    "Email",
+    "Title",
+    "Role Bucket",
+    "Source",
+    "Relationship",
+    "Last Touch",
+    "Next Step",
+    "Selected",
+    "Notes",
+]
+section_header(contacts_sheet, 3, contact_headers)
+if active_contacts:
+    for row_index, contact in enumerate(active_contacts, 4):
+        values = [
+            contact.get("accountName", ""),
+            contact.get("accountDomain", ""),
+            contact.get("contactName", ""),
+            contact.get("email", ""),
+            contact.get("title", ""),
+            contact.get("roleBucket", ""),
+            contact.get("sourceSystem", ""),
+            contact.get("relationshipStatus", ""),
+            contact.get("lastTouchAt", ""),
+            contact.get("nextStep", ""),
+            "Yes" if contact.get("selectedByAm") else "",
+            contact.get("notes", ""),
+        ]
+        for col, value in enumerate(values, 1):
+            contacts_sheet.cell(row=row_index, column=col, value=value)
+    style_table(contacts_sheet, 3, len(active_contacts) + 3, 1, len(contact_headers))
+    contacts_sheet.auto_filter.ref = f"A3:L{len(active_contacts) + 3}"
+else:
+    contacts_sheet["A4"] = "No active contacts imported yet."
+    style_table(contacts_sheet, 3, 4, 1, len(contact_headers))
+contacts_sheet.freeze_panes = "A4"
+set_widths(contacts_sheet, [30, 26, 28, 34, 34, 22, 18, 20, 20, 36, 12, 44])
 
 for sheet in wb.worksheets:
     sheet.sheet_view.showGridLines = False

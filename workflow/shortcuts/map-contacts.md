@@ -17,6 +17,7 @@ Optional:
 
 - Freshsales contacts/leads/accounts/deals/activities/conversations/notes.
 - Apollo candidate contacts when the admin-side Apollo provider is enabled.
+- Imported active contacts from `account-packet.json` when present.
 - Day AI existing People, Organization relationships, Actions, Context, and Gmail history if available.
 - `workflow/config/packs.json` plus Day AI AM/account pack context.
 - `workflow/config/contact-sourcing.json` for provider status and approval rules.
@@ -32,6 +33,7 @@ Optional:
 - Do not trust company name alone.
 - Prefer evidence from domain, linked sales account, email domain, deals, activities, conversations, notes, aliases, and parent/subsidiary clues.
 - Normalize Freshsales, Apollo, Day AI, and manual candidates into the shared contact-candidate shape.
+- Treat imported active contacts as warm candidates/context, not as canonical Day AI People unless the AM approves them.
 - Preserve Apollo normalized fields and a redacted/raw source snapshot; do not discard fields just because they are not canonical Day AI Person fields yet.
 - Assign each candidate an evidence score and source trail.
 
@@ -48,6 +50,7 @@ AM chooses which candidates are useful and which ICP role bucket each selected c
 
 - Candidate contact table.
 - Source label: `Freshsales existing`, `Apollo net-new`, `Day AI existing`, or `Manual`.
+- Include `Imported active contact` for contacts supplied through AM package import.
 - Evidence/source trail.
 - Enrichment state: `not requested`, `requested`, `complete`, `failed`, or `not available`.
 - ICP role fit based on the resolved persona pack.

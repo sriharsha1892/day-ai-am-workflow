@@ -9,6 +9,7 @@ const rosterPath = 'templates/am-roster.csv';
 const seedPath = 'templates/am-account-seed-list.csv';
 const satyaReadyPath = 'templates/satya-ready-accounts.csv';
 const satyaReviewPath = 'templates/satya-identity-review.csv';
+const activeContactsPath = process.env.ACTIVE_CONTACTS_PATH ?? 'templates/am-active-contacts.csv';
 const python = process.env.PYTHON ?? 'python3';
 
 const filesToCopy = [
@@ -28,6 +29,7 @@ const roster = readObjects(rosterPath);
 const seedRows = readObjects(seedPath);
 const satyaReady = readObjects(satyaReadyPath);
 const satyaReview = readObjects(satyaReviewPath);
+const activeContacts = fs.existsSync(activeContactsPath) ? readObjects(activeContactsPath) : [];
 
 fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(outputRoot, { recursive: true });
@@ -47,7 +49,8 @@ for (const am of roster) {
   }
 
   const accounts = buildAccountsForAm(am, seedRows, satyaReady, satyaReview);
-  const packet = buildPacket(am, accounts);
+  const contacts = buildContactsForAm(am, activeContacts);
+  const packet = buildPacket(am, accounts, contacts);
   fs.writeFileSync(path.join(packageDir, 'account-packet.json'), `${JSON.stringify(packet, null, 2)}\n`);
   fs.writeFileSync(path.join(packageDir, 'START_HERE.md'), startHere(packet));
 
@@ -125,13 +128,42 @@ function buildAccountsForAm(am, seeds, readyRows, reviewRows) {
     }));
 }
 
-function buildPacket(am, accounts) {
+function buildContactsForAm(am, contacts) {
+  return contacts
+    .filter((contact) => contact.am_email === am.am_email)
+    .map((contact) => ({
+      accountName: contact.account_name,
+      accountDomain: contact.account_domain,
+      contactName: contact.contact_name,
+      email: contact.email,
+      title: contact.title,
+      roleBucket: contact.role_bucket,
+      linkedinUrl: contact.linkedin_url,
+      phone: contact.phone,
+      sourceSystem: contact.source_system || 'import',
+      sourceContactId: contact.source_contact_id,
+      relationshipStatus: contact.relationship_status,
+      lastTouchAt: contact.last_touch_at,
+      lastTouchChannel: contact.last_touch_channel,
+      nextStep: contact.next_step,
+      selectedByAm: parseBoolean(contact.selected_by_am),
+      notes: contact.notes,
+    }));
+}
+
+function buildPacket(am, accounts, activeContacts) {
   const sorted = [...accounts].sort((a, b) => {
     const statusRank = statusOrder(a.status) - statusOrder(b.status);
     if (statusRank !== 0) return statusRank;
     return priorityOrder(a.priority) - priorityOrder(b.priority);
   });
   const recommended = sorted.find((account) => account.status === 'ready_for_intake') ?? sorted[0] ?? null;
+  const contactsByAccount = new Map();
+  for (const contact of activeContacts) {
+    const key = accountKey(contact.accountDomain, contact.accountName);
+    if (!contactsByAccount.has(key)) contactsByAccount.set(key, []);
+    contactsByAccount.get(key).push(contact);
+  }
   return {
     version: '2.0',
     generatedAt: new Date().toISOString(),
@@ -151,14 +183,17 @@ function buildPacket(am, accounts) {
       domainPending: accounts.filter((account) => account.status === 'domain_pending').length,
       identityReview: accounts.filter((account) => account.status === 'identity_review').length,
       hold: accounts.filter((account) => account.status === 'hold').length,
+      activeContacts: activeContacts.length,
     },
     accounts: sorted.map((account) => ({
       ...account,
       ownerEmail: am.am_email,
+      activeContacts: contactsByAccount.get(accountKey(account.domain, account.accountName)) ?? [],
       intakeCommand: account.status === 'ready_for_intake'
         ? `/account-intake account_name="${escapePrompt(account.accountName)}" domain="${escapePrompt(account.domain)}" owner_email="${am.am_email}"`
         : '',
     })),
+    activeContacts,
     guardrails: [
       'No external sends.',
       'No Freshsales writes.',
@@ -242,6 +277,17 @@ function statusOrder(status) {
 
 function priorityOrder(priority) {
   return { P1: 0, P2: 1, P3: 2 }[priority] ?? 9;
+}
+
+function accountKey(domain, name) {
+  return (domain || name || '').toLowerCase().trim();
+}
+
+function parseBoolean(value) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (['true', 'yes', '1'].includes(normalized)) return true;
+  if (['false', 'no', '0'].includes(normalized)) return false;
+  return false;
 }
 
 function parseCsv(text) {

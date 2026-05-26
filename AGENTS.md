@@ -14,6 +14,7 @@ This workspace defines the standardized account-management workflow for myRA AI 
 
 When the user invokes one of these slash-style shortcuts, load the matching contract in `workflow/shortcuts/` and follow it exactly:
 
+- `/guided-tour` -> `workflow/shortcuts/guided-tour.md`
 - `/account-intake` -> `workflow/shortcuts/account-intake.md`
 - `/research-account` -> `workflow/shortcuts/research-account.md`
 - `/map-contacts` -> `workflow/shortcuts/map-contacts.md`
@@ -28,6 +29,27 @@ When the user invokes one of these slash-style shortcuts, load the matching cont
 - `/account-health` -> `workflow/shortcuts/account-health.md`
 
 Each shortcut contract defines required inputs, reads, decision points, writes, and done criteria. If a required input is missing, ask only for that input.
+
+Also treat these phrases as `/guided-tour`:
+
+- `Start my myRA AM tour`
+- `Start my AM guided tour`
+- `Resume my myRA AM tour`
+
+For the guided tour, load `account-packet.json` first when present. Use `MY_ACCOUNTS.xlsx` as the AM-facing cockpit, not as the primary runtime source.
+
+## Day AI Handoff Receipts
+
+Before any Day AI write, show a short pre-write receipt:
+
+- Organization
+- Opportunity/account motion
+- Context/page
+- People
+- Actions
+- Email drafts
+
+Ask for AM approval when the shortcut contract requires it. After the write, show what was saved with object type, name, status, and link or record ID when Day AI returns one. If no link or ID is returned, say that plainly and provide the object names/actions attempted.
 
 ## Pack Resolution
 
@@ -89,3 +111,14 @@ Use `docs/freshsales-integration.md` as the source of truth for Freshsales. Requ
 - Handle conversations through the multi-probe pattern.
 - Respect rate limits, concurrency, retries, and cache TTLs.
 - Do not cache conversations or notes.
+
+## Contact Sourcing Boundary
+
+Use `workflow/config/contact-sourcing.json` and `docs/contact-sourcing.md` for modular contact sourcing.
+
+- Freshsales is read-only CRM evidence.
+- Apollo is admin-only contact sourcing with selective enrichment.
+- Clearout is disabled in v1 and reserved for future verification.
+- `/map-contacts` combines candidates from enabled providers but does not create canonical Day AI People.
+- `/dedupe-contacts` creates Day AI People only after AM approval.
+- Preserve normalized source fields and a redacted/raw source snapshot for Apollo data so useful fields can be backfilled later.

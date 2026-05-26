@@ -1,0 +1,36 @@
+{
+  "$schema": "../schemas/contact-sourcing.schema.json",
+  "providers": {
+    "freshsales": {
+      "enabled": true,
+      "mode": "read_only",
+      "secretScope": "admin_local",
+      "purpose": "Existing CRM evidence, activity, account/contact/deal context"
+    },
+    "apollo": {
+      "enabled": false,
+      "mode": "admin_only",
+      "secretScope": "admin_local",
+      "purpose": "Net-new contact sourcing and selective enrichment",
+      "defaultSearchLimitPerAccount": 25,
+      "enrichmentPolicy": "selective_only"
+    },
+    "clearout": {
+      "enabled": false,
+      "mode": "verification_only",
+      "secretScope": "admin_local",
+      "purpose": "Future email verification gate"
+    }
+  },
+  "approvalRules": {
+    "createDayAiPerson": "am_approval_required",
+    "apolloEnrichment": "admin_or_credit_approval_required",
+    "externalSend": "never_automatic"
+  },
+  "rawSnapshotPolicy": {
+    "storeNormalizedFields": true,
+    "storeRedactedRawSnapshot": true,
+    "redactKeys": ["api_key", "token", "authorization", "cookie", "personal_phone", "mobile_phone"],
+    "dayAiStorage": "account_context_source_trail"
+  }
+}

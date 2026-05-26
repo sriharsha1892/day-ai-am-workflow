@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/contact-sourcing.schema.json",
+  "title": "myRA Contact Sourcing Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["providers", "approvalRules", "rawSnapshotPolicy"],
+  "properties": {
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshsales", "apollo", "clearout"],
+      "properties": {
+        "freshsales": { "$ref": "#/$defs/provider" },
+        "apollo": { "$ref": "#/$defs/provider" },
+        "clearout": { "$ref": "#/$defs/provider" }
+      }
+    },
+    "approvalRules": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "rawSnapshotPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storeNormalizedFields", "storeRedactedRawSnapshot", "redactKeys", "dayAiStorage"],
+      "properties": {
+        "storeNormalizedFields": { "type": "boolean" },
+        "storeRedactedRawSnapshot": { "type": "boolean" },
+        "redactKeys": { "type": "array", "items": { "type": "string" } },
+        "dayAiStorage": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "provider": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "mode", "secretScope", "purpose"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string" },
+        "secretScope": { "type": "string" },
+        "purpose": { "type": "string" }
+      }
+    }
+  }
+}

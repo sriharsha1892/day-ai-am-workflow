@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/contact-candidate.schema.json",
+  "title": "myRA Contact Candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidateId", "accountDomain", "sourceSystem", "selectedByAm"],
+  "properties": {
+    "candidateId": { "type": "string" },
+    "accountDomain": { "type": "string" },
+    "sourceSystem": { "enum": ["freshsales", "apollo", "day_ai", "manual"] },
+    "sourceIds": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "name": { "type": "string" },
+    "firstName": { "type": "string" },
+    "lastName": { "type": "string" },
+    "title": { "type": "string" },
+    "headline": { "type": "string" },
+    "linkedinUrl": { "type": "string" },
+    "email": { "type": "string" },
+    "emailStatus": { "type": "string" },
+    "phoneStatus": { "type": "string" },
+    "organizationName": { "type": "string" },
+    "organizationDomain": { "type": "string" },
+    "organizationId": { "type": "string" },
+    "location": { "type": "string" },
+    "roleBucket": { "type": "string" },
+    "seniorityMatch": { "type": "string" },
+    "evidenceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+    "evidenceTrail": { "type": "array", "items": { "type": "string" } },
+    "enrichmentStatus": { "enum": ["not_requested", "requested", "complete", "failed", "not_available"] },
+    "creditsConsumed": { "type": "number", "minimum": 0 },
+    "selectedByAm": { "type": "boolean" },
+    "rawSnapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "capturedAt", "payload"],
+        "properties": {
+          "source": { "type": "string" },
+          "capturedAt": { "type": "string" },
+          "payload": { "type": "object", "additionalProperties": true }
+        }
+      }
+    }
+  }
+}

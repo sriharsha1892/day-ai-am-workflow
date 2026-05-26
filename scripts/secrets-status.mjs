@@ -8,6 +8,7 @@ const required = [
   'FRESHSALES_API_KEY',
   'FRESHSALES_ORG_DOMAIN',
   'APOLLO_API_KEY',
+  'CLEAROUT_BASE_URL',
   'CLEAROUT_API_TOKEN',
 ];
 

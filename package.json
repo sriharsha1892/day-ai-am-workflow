@@ -20,6 +20,8 @@
     "secrets:status": "node scripts/secrets-status.mjs",
     "secrets:set": "node scripts/set-admin-secret.mjs",
     "freshsales:probe": "node scripts/freshsales-probe.mjs",
+    "apollo:probe": "node scripts/apollo-probe.mjs",
+    "clearout:probe": "node scripts/clearout-probe.mjs",
     "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:assignments && npm run validate:trial-import"
   }
 }

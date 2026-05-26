@@ -23,7 +23,6 @@ Required columns:
 ```text
 am_email
 am_name
-account_name
 contact_name
 source_system
 ```
@@ -31,6 +30,7 @@ source_system
 Recommended columns:
 
 ```text
+account_name
 account_domain
 email
 title
@@ -66,6 +66,8 @@ When the active contacts file is present, AM tour packages include those contact
 - `MY_ACCOUNTS.xlsx` on the `Active Contacts` sheet
 
 Codex should use active contacts as warm context during `/map-contacts` and `/dedupe-contacts`.
+
+Contacts without `account_name` or `account_domain` are still imported as unassigned active contacts. They appear in the AM packet and can be linked to an account later, but Codex should not attach them to an account automatically.
 
 ## Guardrail
 

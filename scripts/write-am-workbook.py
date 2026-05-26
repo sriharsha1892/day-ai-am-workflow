@@ -226,7 +226,7 @@ section_header(contacts_sheet, 3, contact_headers)
 if active_contacts:
     for row_index, contact in enumerate(active_contacts, 4):
         values = [
-            contact.get("accountName", ""),
+            contact.get("accountName", "") or "Unassigned",
             contact.get("accountDomain", ""),
             contact.get("contactName", ""),
             contact.get("email", ""),

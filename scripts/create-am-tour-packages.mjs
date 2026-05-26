@@ -159,8 +159,13 @@ function buildPacket(am, accounts, activeContacts) {
   });
   const recommended = sorted.find((account) => account.status === 'ready_for_intake') ?? sorted[0] ?? null;
   const contactsByAccount = new Map();
+  const unassignedContacts = [];
   for (const contact of activeContacts) {
     const key = accountKey(contact.accountDomain, contact.accountName);
+    if (!key) {
+      unassignedContacts.push(contact);
+      continue;
+    }
     if (!contactsByAccount.has(key)) contactsByAccount.set(key, []);
     contactsByAccount.get(key).push(contact);
   }
@@ -184,6 +189,7 @@ function buildPacket(am, accounts, activeContacts) {
       identityReview: accounts.filter((account) => account.status === 'identity_review').length,
       hold: accounts.filter((account) => account.status === 'hold').length,
       activeContacts: activeContacts.length,
+      unassignedActiveContacts: unassignedContacts.length,
     },
     accounts: sorted.map((account) => ({
       ...account,

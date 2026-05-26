@@ -10,11 +10,11 @@ const rosterPath = process.argv[3] ?? 'templates/am-roster.csv';
 const requiredHeaders = [
   'am_email',
   'am_name',
-  'account_name',
   'contact_name',
   'source_system',
 ];
 const optionalHeaders = [
+  'account_name',
   'account_domain',
   'email',
   'title',
@@ -66,7 +66,6 @@ for (let index = 1; index < rows.length; index += 1) {
   if (roster.has(row.am_email) && roster.get(row.am_email) !== row.am_name) {
     errors.push(`Row ${rowNumber}: am_name does not match roster for ${row.am_email}`);
   }
-  if (!row.account_name) errors.push(`Row ${rowNumber}: account_name is required`);
   if (row.account_domain && !isDomain(row.account_domain)) errors.push(`Row ${rowNumber}: account_domain must be valid when provided`);
   if (!row.contact_name) errors.push(`Row ${rowNumber}: contact_name is required`);
   if (row.email && !isEmail(row.email)) errors.push(`Row ${rowNumber}: email must be valid when provided`);
@@ -85,7 +84,7 @@ for (let index = 1; index < rows.length; index += 1) {
 
   const key = [
     row.am_email.toLowerCase(),
-    (row.account_domain || row.account_name).toLowerCase(),
+    (row.account_domain || row.account_name || 'unassigned').toLowerCase(),
     (row.email || row.linkedin_url || row.contact_name).toLowerCase(),
   ].join('|');
   if (seen.has(key)) errors.push(`Row ${rowNumber}: duplicate active contact assignment`);

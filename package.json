@@ -14,6 +14,8 @@
     "validate:active-contacts": "node scripts/validate-active-contacts.mjs templates/am-active-contacts.csv",
     "validate:assignments": "node scripts/validate-account-assignments.mjs templates/am-account-assignments.csv",
     "validate:trial-import": "node scripts/validate-trial-import.mjs templates/trial-usage-import.csv",
+    "org-editor:create": "python3 scripts/create-organization-editor.py templates/am-account-seed-list.csv templates/am-roster.csv",
+    "org-editor:import": "python3 scripts/import-organization-editor.py",
     "provision:assignments:preview": "node scripts/prepare-account-provisioning.mjs templates/am-account-assignments.csv",
     "am:packets": "node scripts/create-am-packets.mjs",
     "am:tour-packages": "node scripts/create-am-tour-packages.mjs",

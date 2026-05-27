@@ -82,6 +82,19 @@ npm run validate:packs
 npm run validate:assignments
 ```
 
+Create an editable Excel workbook for AM organization ownership:
+
+```bash
+npm run org-editor:create -- /Users/sriharsha/Desktop/myra-am-organization-editor.xlsx
+```
+
+After editing the workbook, import it back into the package source CSV:
+
+```bash
+npm run org-editor:import -- /Users/sriharsha/Desktop/myra-am-organization-editor.xlsx
+npm run validate:account-seeds
+```
+
 Preview one-time account provisioning commands:
 
 ```bash

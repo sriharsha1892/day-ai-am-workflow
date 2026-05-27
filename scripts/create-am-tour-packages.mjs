@@ -200,10 +200,33 @@ function buildPacket(am, accounts, activeContacts) {
         : '',
     })),
     activeContacts,
+    connectorAccess: {
+      model: 'centralized_admin_runtime',
+      amKeysRequired: false,
+      providers: {
+        freshsales: {
+          enabled: true,
+          mode: 'read_only',
+          shortcuts: ['/freshsales-lookup', '/account-intake', '/map-contacts'],
+        },
+        apollo: {
+          enabled: true,
+          mode: 'net_new_search_selective_enrichment',
+          shortcuts: ['/source-new-contacts', '/map-contacts'],
+        },
+        clearout: {
+          enabled: true,
+          mode: 'selected_email_verification',
+          shortcuts: ['/verify-contact-email', '/source-new-contacts'],
+        },
+      },
+      fallback: 'Codex should create a Day AI connector request or pause with the exact payload; never ask the AM for API keys.',
+    },
     guardrails: [
       'No external sends.',
       'No Freshsales writes.',
       'No Apollo writes or sequences.',
+      'No provider API keys in this package.',
       'No canonical Day AI People without AM approval.',
       'Show Day AI handoff receipts before and after writes.',
     ],
@@ -232,6 +255,7 @@ Codex will:
 - Show your queue and recommend the next account.
 - Pause before Day AI writes.
 - Show Day AI handoff receipts.
+- Request Freshsales/Apollo/Clearout evidence through centralized connectors when needed.
 
 Recommended first account: ${recommended}
 

@@ -21,6 +21,8 @@ Load the matching contract and follow it exactly:
 - `/research-account` -> `workflow/shortcuts/research-account.md`
 - `/map-contacts` -> `workflow/shortcuts/map-contacts.md`
 - `/source-new-contacts` -> `workflow/shortcuts/source-new-contacts.md`
+- `/verify-contact-email` -> `workflow/shortcuts/verify-contact-email.md`
+- `/freshsales-lookup` -> `workflow/shortcuts/freshsales-lookup.md`
 - `/dedupe-contacts` -> `workflow/shortcuts/dedupe-contacts.md`
 - `/build-cadence` -> `workflow/shortcuts/build-cadence.md`
 - `/draft-outreach` -> `workflow/shortcuts/draft-outreach.md`
@@ -37,7 +39,7 @@ If a required input is missing, ask only for that input.
 
 - Day AI is canonical for account state, selected contacts, tasks, drafts, ledger, and health.
 - Freshsales is read-only.
-- Apollo and Clearout are admin-only connector flows; AM packages never contain API keys.
+- Freshsales, Apollo, and Clearout are accessed through the centralized connector runtime; AM packages never contain API keys.
 - AM approval is required before external sends, canonical contact creation, lifecycle changes after intake, and future calendar creation.
 - Outreach metrics count only AM-selected contacts and Day AI ledger activity.
 - Keep outputs grounded in myRA positioning: decision-grade intelligence, expert-validated research, market/competitive/customer/supplier/trend intelligence, internal data integrations, and accountable research outputs.
@@ -61,5 +63,6 @@ After Day AI writes, show object type, name, status, and link or record ID when 
 - Contact sourcing: `workflow/config/contact-sourcing.json`
 - Day AI mapping: `docs/day-ai-mapping.md`
 - Freshsales: `docs/freshsales-integration.md`
+- Centralized connectors: `docs/centralized-connectors.md`
 - Apollo/Clearout: `docs/contact-sourcing.md`
 - Active contacts import: `docs/active-contacts-import.md`

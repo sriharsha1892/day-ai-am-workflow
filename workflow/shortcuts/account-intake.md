@@ -19,7 +19,14 @@ Optional:
 ## Reads
 
 - Day AI: existing Organization, Opportunity, People, Actions, Pages, Context for the domain and aliases.
-- Freshsales: candidate accounts, contacts/leads, deals, and activities using evidence-based matching.
+- Freshsales: candidate accounts, contacts/leads, deals, and activities using evidence-based matching through the centralized connector runtime.
+
+## Connector Handling
+
+- AMs do not need a Freshsales key.
+- Codex should call the centralized Freshsales connector when available.
+- If the connector is unavailable, pause with a Freshsales lookup request payload rather than asking the AM for credentials.
+- Freshsales is read-only; never create, update, merge, or delete CRM records.
 
 ## AM Decision Point
 

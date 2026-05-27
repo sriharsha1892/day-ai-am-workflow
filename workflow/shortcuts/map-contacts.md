@@ -15,13 +15,20 @@ Optional:
 
 ## Reads
 
-- Freshsales contacts/leads/accounts/deals/activities/conversations/notes.
-- Apollo candidate contacts when the admin-side Apollo provider is enabled.
+- Freshsales contacts/leads/accounts/deals/activities/conversations/notes through the centralized connector.
+- Apollo candidate contacts when the centralized Apollo provider is enabled.
 - Clearout verification state for candidate emails when available.
 - Imported active contacts from `account-packet.json` when present.
 - Day AI existing People, Organization relationships, Actions, Context, and Gmail history if available.
 - `workflow/config/packs.json` plus Day AI AM/account pack context.
 - `workflow/config/contact-sourcing.json` for provider status and approval rules.
+
+## Connector Handling
+
+- AMs can request Freshsales, Apollo, and Clearout-backed contact mapping from Codex without local keys.
+- Codex must route provider calls through the centralized connector runtime.
+- If the connector is unavailable, pause with a specific connector request instead of asking the AM for keys.
+- Freshsales is always read-only; Apollo and Clearout are selective, credit-aware enrich/verify steps.
 
 ## Pack Resolution
 

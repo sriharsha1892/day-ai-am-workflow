@@ -1,25 +1,35 @@
 {
   "$schema": "../schemas/contact-sourcing.schema.json",
+  "centralizedConnector": {
+    "enabled": true,
+    "keyOwner": "admin_runtime",
+    "amKeysRequired": false,
+    "requestPolicy": "am_can_request_provider_actions_codex_routes_to_central_connector",
+    "fallbackWhenUnavailable": "create_day_ai_connector_request_or_pause_for_admin"
+  },
   "providers": {
     "freshsales": {
       "enabled": true,
-      "mode": "read_only",
+      "mode": "centralized_read_only",
       "secretScope": "admin_local",
-      "purpose": "Existing CRM evidence, activity, account/contact/deal context"
+      "purpose": "Existing CRM evidence, activity, account/contact/deal context",
+      "amVisible": true
     },
     "apollo": {
       "enabled": true,
-      "mode": "admin_only",
+      "mode": "centralized_am_requested",
       "secretScope": "admin_local",
       "purpose": "Net-new contact sourcing and selective enrichment",
+      "amVisible": true,
       "defaultSearchLimitPerAccount": 25,
       "enrichmentPolicy": "selective_only"
     },
     "clearout": {
       "enabled": true,
-      "mode": "admin_only_verification",
+      "mode": "centralized_am_requested_verification",
       "secretScope": "admin_local",
       "purpose": "Selective email verification for enriched or imported candidate emails",
+      "amVisible": true,
       "verificationPolicy": "verify_selected_or_enriched_emails_only"
     }
   },

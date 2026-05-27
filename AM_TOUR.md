@@ -11,13 +11,15 @@ Start my AM guided tour. Use my account packet, show my priority queue, recommen
 ## Tour Rules
 
 - Confirm Day AI MCP access before account work.
-- Load the AM's `MY_ACCOUNTS.csv`.
+- Load `account-packet.json` first, then use the AM's `MY_ACCOUNTS.xlsx` as the cockpit.
 - Show only accounts in that packet.
 - Recommend the first account by priority, then packet order.
 - For Satya's pilot, recommend Sherwin-Williams first.
 - Pause after every checkpoint before Day AI writes or before moving to the next station.
+- Use centralized connectors for Freshsales, Apollo, and Clearout when a shortcut calls for provider evidence.
 - Do not send external emails.
 - Do not write to Freshsales.
+- Do not ask AMs for Freshsales, Apollo, or Clearout keys.
 - Do not create canonical contacts unless the AM explicitly approves selected contacts.
 
 ## Checkpoints
@@ -28,7 +30,7 @@ Start my AM guided tour. Use my account packet, show my priority queue, recommen
    - Confirm the AM identity or owner email.
 
 2. **Priority Queue**
-   - Read `MY_ACCOUNTS.csv`.
+   - Read `account-packet.json` and show the matching `MY_ACCOUNTS.xlsx` queue.
    - Show the account queue with account name, domain, priority, confidence, and notes.
    - Recommend the next account.
 
@@ -48,7 +50,9 @@ Start my AM guided tour. Use my account packet, show my priority queue, recommen
 
 5. **Contact Mapping**
    - Run `/map-contacts`.
-   - Present candidate contacts and missing role gaps.
+   - Present Freshsales existing contacts, Apollo net-new candidates when needed, imported contacts, and missing role gaps.
+   - Use `/source-new-contacts` if the account has weak contact coverage.
+   - Use `/verify-contact-email` only for selected candidate emails.
    - Ask the AM which contacts to approve for canonicalization.
 
 6. **Contact Approval**
@@ -83,4 +87,3 @@ The first guided tour is complete when Day AI has:
 - At least one outreach draft.
 - At least one next-step task.
 - An account health snapshot or readout.
-

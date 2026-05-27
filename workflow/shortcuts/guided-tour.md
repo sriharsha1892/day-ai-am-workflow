@@ -17,6 +17,7 @@ Optional:
 - `account-packet.json` first for fast runtime state.
 - `MY_ACCOUNTS.xlsx` only as the AM-facing cockpit reference.
 - Day AI MCP status and existing Day AI account context.
+- Centralized connector availability from `workflow/config/contact-sourcing.json`.
 - Shortcut contracts for the next checkpoint.
 
 ## Preflight
@@ -26,6 +27,7 @@ Optional:
 - Confirm Day AI MCP is configured.
 - If Day AI MCP is missing, run `node scripts/setup-codex.mjs` and ask the AM to complete browser OAuth if prompted.
 - Run `node scripts/check-codex-setup.mjs` when setup changes.
+- Confirm AMs do not need Freshsales, Apollo, or Clearout keys; provider requests route through the centralized connector.
 
 ## Queue Behavior
 
@@ -39,12 +41,15 @@ Optional:
 1. Account selection.
 2. `/account-intake`.
 3. `/research-account`.
-4. `/map-contacts`.
-5. `/dedupe-contacts` for AM-approved contacts only.
-6. `/build-cadence`.
-7. `/draft-outreach`.
-8. `/log-touch` only if the AM manually completed a touch.
-9. `/account-health`.
+4. `/freshsales-lookup` when existing CRM evidence needs to be inspected directly.
+5. `/map-contacts`.
+6. `/source-new-contacts` if contact coverage is weak or a persona gap exists.
+7. `/verify-contact-email` only for selected candidate emails.
+8. `/dedupe-contacts` for AM-approved contacts only.
+9. `/build-cadence`.
+10. `/draft-outreach`.
+11. `/log-touch` only if the AM manually completed a touch.
+12. `/account-health`.
 
 ## Day AI Handoff Receipts
 

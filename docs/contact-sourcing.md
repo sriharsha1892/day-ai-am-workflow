@@ -6,9 +6,11 @@ Contact sourcing is modular. Day AI remains the system of record; providers only
 
 | Provider | V1 Role | Secret Scope | Writes |
 | --- | --- | --- | --- |
-| Freshsales | Existing CRM evidence and activity | Admin local | Read-only |
-| Apollo | Net-new contact sourcing and selective enrichment | Admin local | No Apollo writes |
-| Clearout | Selective email verification for enriched/imported candidates | Admin local | No Clearout writes |
+| Freshsales | Existing CRM evidence and activity | Centralized connector | Read-only |
+| Apollo | Net-new contact sourcing and selective enrichment | Centralized connector | No Apollo writes |
+| Clearout | Selective email verification for enriched/imported candidates | Centralized connector | No Clearout writes |
+
+AMs can request these provider actions from Codex, but keys remain centralized. If the connector is not reachable, Codex should create a connector request or pause with the exact request payload rather than asking the AM for credentials. See `docs/centralized-connectors.md`.
 | Day AI | Canonical account/contact state | AM OAuth | Canonical writes after approval |
 
 ## Apollo Search Fields
@@ -57,7 +59,7 @@ Clearout should verify selected or enriched candidate emails only. Do not bulk-v
 
 ## New Contact Flow
 
-Use `/source-new-contacts` for admin-side net-new sourcing:
+Use `/source-new-contacts` for AM-requested, connector-backed net-new sourcing:
 
 ```text
 account/domain

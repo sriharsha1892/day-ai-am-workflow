@@ -87,6 +87,7 @@ actions = [
     "Load account-packet.json for speed.",
     "Show your priority queue.",
     "Recommend the next account.",
+    "Request Freshsales/Apollo/Clearout through centralized connectors when needed.",
     "Pause before every Day AI write.",
     "Show a Day AI receipt after every write.",
 ]
@@ -98,7 +99,7 @@ guardrails = [
     "It will not send emails.",
     "It will not write to Freshsales.",
     "It will not create contacts without approval.",
-    "It will not use Apollo/Clearout keys from this package.",
+    "It will not use provider keys from this package.",
 ]
 for offset, action in enumerate(guardrails, 10):
     start.cell(row=offset, column=4, value=f"- {action}")

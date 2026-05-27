@@ -1,6 +1,6 @@
 # /source-new-contacts
 
-Admin-only workflow to source net-new contact candidates for an account.
+AM-triggered workflow to source net-new contact candidates for an account through the centralized connector runtime.
 
 ## Required Inputs
 
@@ -20,15 +20,23 @@ Optional:
 
 - `workflow/config/contact-sourcing.json`.
 - `workflow/config/packs.json` for persona role priorities.
-- Apollo People Search when enabled and admin secrets are available.
+- Apollo People Search through the centralized connector when enabled.
 - Apollo enrichment only for explicitly selected or top-ranked candidates.
 - Clearout verification only for selected/enriched candidate emails.
 - Freshsales/Day AI context only for dedupe evidence when available.
 
+## Connector Handling
+
+- AMs can invoke this shortcut from their package; they do not need Apollo or Clearout keys.
+- If the centralized connector is available, route Apollo/Clearout requests through it.
+- If the connector is unavailable, create a Day AI connector request or pause with the exact request payload the admin must run.
+- Show estimated Apollo enrichment and Clearout verification cost before paid/credit-consuming calls.
+- Do not expose API keys, auth headers, raw tokens, or private connector logs in AM output.
+
 ## Does Not Do
 
 - Does not send outreach.
-- Does not create Apollo sequences.
+- Does not create Apollo sequences or write back to Apollo.
 - Does not write to Freshsales.
 - Does not create Day AI People without AM/admin approval.
 - Does not enrich or verify every candidate by default.

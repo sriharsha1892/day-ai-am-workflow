@@ -2,7 +2,7 @@
 
 This repo standardizes how myRA AMs work accounts using Codex shortcuts and Day AI as the system of record.
 
-The pack is intentionally operational: each shortcut has a contract, each write has an approval boundary, and Freshsales is treated as a read-only enrichment source.
+The pack is intentionally operational: each shortcut has a contract, each write has an approval boundary, and Freshsales/Apollo/Clearout run through centralized connectors so AMs do not handle API keys.
 
 ## Quick Start
 
@@ -26,6 +26,8 @@ The pack is intentionally operational: each shortcut has a contract, each write 
    /account-intake account_name="Acme" domain="acme.com"
    /research-account domain="acme.com"
    /map-contacts domain="acme.com" aliases="Acme Inc, Acme Corp"
+   /source-new-contacts account_name="Acme" domain="acme.com"
+   /freshsales-lookup account_name="Acme" domain="acme.com"
    ```
 
 Codex should load `AGENTS.md`, then follow the matching file in `workflow/shortcuts/`.
@@ -43,6 +45,8 @@ Day AI stores the canonical account motion:
 
 Freshsales is read-only in v1. It supplies contact/account/deal/activity/conversation/notes evidence, but it does not receive updates from this workflow.
 
+Apollo and Clearout are available to AMs as Codex-triggered, centralized connector flows. AMs can request contact sourcing, selected enrichment, and selected email verification, but the keys remain in the admin runtime and no AM zip contains secrets.
+
 ## Workflow Files
 
 - `workflow/shortcuts/`: slash-style shortcut contracts.
@@ -52,6 +56,7 @@ Freshsales is read-only in v1. It supplies contact/account/deal/activity/convers
 - `docs/modularity-and-packs.md`: pack resolution and guardrail rules.
 - `docs/day-ai-mapping.md`: how workflow concepts map to Day AI objects/tools.
 - `docs/freshsales-integration.md`: Freshsales integration boundary and implementation guide.
+- `docs/centralized-connectors.md`: how AMs use Freshsales, Apollo, and Clearout without local keys.
 - `docs/team-rollout.md`: instructions for AMs to clone, set up, and run the workflow.
 - `templates/am-account-assignments.csv`: AM/account assignment import shape with optional pack columns.
 - `templates/am-roster.csv`: AM roster for validation and assignment checks.

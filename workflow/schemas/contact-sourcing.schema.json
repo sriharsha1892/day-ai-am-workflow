@@ -6,6 +6,18 @@
   "additionalProperties": false,
   "required": ["providers", "approvalRules", "rawSnapshotPolicy"],
   "properties": {
+    "centralizedConnector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "keyOwner", "amKeysRequired", "requestPolicy", "fallbackWhenUnavailable"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "keyOwner": { "type": "string" },
+        "amKeysRequired": { "type": "boolean" },
+        "requestPolicy": { "type": "string" },
+        "fallbackWhenUnavailable": { "type": "string" }
+      }
+    },
     "providers": {
       "type": "object",
       "additionalProperties": false,

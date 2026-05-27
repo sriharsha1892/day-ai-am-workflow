@@ -1,23 +1,26 @@
 # myRA AM Workflow Pack
 
-This workspace defines the standardized account-management workflow for myRA AI with Day AI as the system of record and Codex as the guided execution surface.
+Codex is the guided execution surface. Day AI is the system of record.
 
-## Non-Negotiables
+## Start Here
 
-- Day AI is the primary system of record.
-- Freshsales is read-only in v1. Never mutate, merge, or delete Freshsales records.
-- AMs must approve customer-facing sends, canonical contact creation, lifecycle stage changes after intake, and any future calendar event creation.
-- Outreach metrics count only AM-selected contacts and Day AI ledger activity. Freshsales history enriches context but does not automatically count as active outreach.
-- Keep outputs grounded in myRA positioning: decision-grade intelligence, expert-validated research, market intelligence, competitive intelligence, customer acquisition, supplier intelligence, trend analysis, internal data integrations, and accountable research outputs.
+If the user says any of these, run `/guided-tour`:
 
-## Shortcut Execution
+- `Start my myRA AM tour`
+- `Start my AM guided tour`
+- `Resume my myRA AM tour`
 
-When the user invokes one of these slash-style shortcuts, load the matching contract in `workflow/shortcuts/` and follow it exactly:
+For the tour, load `account-packet.json` first. Use `MY_ACCOUNTS.xlsx` as the AM-facing cockpit, not the runtime source.
+
+## Shortcut Router
+
+Load the matching contract and follow it exactly:
 
 - `/guided-tour` -> `workflow/shortcuts/guided-tour.md`
 - `/account-intake` -> `workflow/shortcuts/account-intake.md`
 - `/research-account` -> `workflow/shortcuts/research-account.md`
 - `/map-contacts` -> `workflow/shortcuts/map-contacts.md`
+- `/source-new-contacts` -> `workflow/shortcuts/source-new-contacts.md`
 - `/dedupe-contacts` -> `workflow/shortcuts/dedupe-contacts.md`
 - `/build-cadence` -> `workflow/shortcuts/build-cadence.md`
 - `/draft-outreach` -> `workflow/shortcuts/draft-outreach.md`
@@ -28,19 +31,20 @@ When the user invokes one of these slash-style shortcuts, load the matching cont
 - `/product-update` -> `workflow/shortcuts/product-update.md`
 - `/account-health` -> `workflow/shortcuts/account-health.md`
 
-Each shortcut contract defines required inputs, reads, decision points, writes, and done criteria. If a required input is missing, ask only for that input.
+If a required input is missing, ask only for that input.
 
-Also treat these phrases as `/guided-tour`:
+## Non-Negotiables
 
-- `Start my myRA AM tour`
-- `Start my AM guided tour`
-- `Resume my myRA AM tour`
+- Day AI is canonical for account state, selected contacts, tasks, drafts, ledger, and health.
+- Freshsales is read-only.
+- Apollo and Clearout are admin-only connector flows; AM packages never contain API keys.
+- AM approval is required before external sends, canonical contact creation, lifecycle changes after intake, and future calendar creation.
+- Outreach metrics count only AM-selected contacts and Day AI ledger activity.
+- Keep outputs grounded in myRA positioning: decision-grade intelligence, expert-validated research, market/competitive/customer/supplier/trend intelligence, internal data integrations, and accountable research outputs.
 
-For the guided tour, load `account-packet.json` first when present. Use `MY_ACCOUNTS.xlsx` as the AM-facing cockpit, not as the primary runtime source.
+## Day AI Receipts
 
-## Day AI Handoff Receipts
-
-Before any Day AI write, show a short pre-write receipt:
+Before Day AI writes, show:
 
 - Organization
 - Opportunity/account motion
@@ -49,76 +53,13 @@ Before any Day AI write, show a short pre-write receipt:
 - Actions
 - Email drafts
 
-Ask for AM approval when the shortcut contract requires it. After the write, show what was saved with object type, name, status, and link or record ID when Day AI returns one. If no link or ID is returned, say that plainly and provide the object names/actions attempted.
+After Day AI writes, show object type, name, status, and link or record ID when available. If Day AI returns no link/ID, say so plainly.
 
-## Pack Resolution
+## Config And Details
 
-Before producing output for pack-aware shortcuts, load `workflow/config/packs.json` and resolve:
-
-- `personaPack`
-- `cadencePack`
-- `channelPack`
-
-Resolution order:
-
-1. Global defaults from `workflow/config/packs.json`.
-2. Day AI AM profile context.
-3. Day AI account context.
-4. Ask the AM once if still missing.
-
-Pack-aware shortcuts:
-
-- `/map-contacts`
-- `/build-cadence`
-- `/draft-outreach`
-- `/demo-prep`
-- `/product-update`
-- `/account-health`
-
-`/account-intake` and bulk provisioning may seed account-level pack choices when provided. Always save chosen account-level packs to Day AI account context. Update AM profile context only when the AM explicitly asks to reuse those choices.
-
-Allowed customizations: persona pack, cadence pack, channel pack, tone, CTA, length, and freeform instructions.
-
-Guardrails cannot be overridden: approval before external sends, approval before canonical contact creation, approval before lifecycle changes after intake, Freshsales read-only mode, no calendar write in v1, and Day AI ledger-only outreach metrics.
-
-## Shared Defaults
-
-- Lifecycle stages: `Researching`, `Contacts Mapped`, `Outreach Active`, `Demo Scheduled`, `Demo Done`, `Trial Active`, `Trial Follow-up`, `Negotiation`, `Won`, `Lost`, `Nurture`.
-- ICP role buckets: `Strategy`, `Market Intelligence`, `Insights/Research`, `Innovation`, `Corporate Development`, `Procurement`, `Business Unit Leader`.
-- Account seed: account name plus primary domain.
-- AM customization model: admin defaults plus AM overrides.
-- Trial usage source: Excel import until a product API is available.
-- Flexible packs: `personaPack`, `cadencePack`, and `channelPack` from `workflow/config/packs.json`.
-
-## Day AI Write Surfaces
-
-Use Day AI MCP tools when available:
-
-- Organization: company truth and account metadata.
-- Opportunity: lifecycle progress and commercial motion.
-- People: canonical AM-selected ICP contacts.
-- Actions: follow-ups, call tasks, manual LinkedIn/WhatsApp tasks, demo/trial tasks.
-- Email drafts: AM-reviewed outreach and follow-up drafts.
-- Pages/context: account plan, research, signals, call notes, trial notes, decisions, and account health snapshots.
-
-## Freshsales Boundary
-
-Use `docs/freshsales-integration.md` as the source of truth for Freshsales. Required principles:
-
-- Server-side API key only.
-- Use contact/lead lookup, account/deal fetches, activities, conversations, notes, and selectors.
-- Use evidence-based account matching because account names are inconsistent.
-- Handle conversations through the multi-probe pattern.
-- Respect rate limits, concurrency, retries, and cache TTLs.
-- Do not cache conversations or notes.
-
-## Contact Sourcing Boundary
-
-Use `workflow/config/contact-sourcing.json` and `docs/contact-sourcing.md` for modular contact sourcing.
-
-- Freshsales is read-only CRM evidence.
-- Apollo is admin-only contact sourcing with selective enrichment.
-- Clearout is disabled in v1 and reserved for future verification.
-- `/map-contacts` combines candidates from enabled providers but does not create canonical Day AI People.
-- `/dedupe-contacts` creates Day AI People only after AM approval.
-- Preserve normalized source fields and a redacted/raw source snapshot for Apollo data so useful fields can be backfilled later.
+- Packs: `workflow/config/packs.json`
+- Contact sourcing: `workflow/config/contact-sourcing.json`
+- Day AI mapping: `docs/day-ai-mapping.md`
+- Freshsales: `docs/freshsales-integration.md`
+- Apollo/Clearout: `docs/contact-sourcing.md`
+- Active contacts import: `docs/active-contacts-import.md`

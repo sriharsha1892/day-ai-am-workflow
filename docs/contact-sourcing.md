@@ -8,7 +8,7 @@ Contact sourcing is modular. Day AI remains the system of record; providers only
 | --- | --- | --- | --- |
 | Freshsales | Existing CRM evidence and activity | Admin local | Read-only |
 | Apollo | Net-new contact sourcing and selective enrichment | Admin local | No Apollo writes |
-| Clearout | Future email verification | Admin local | Disabled |
+| Clearout | Selective email verification for enriched/imported candidates | Admin local | No Clearout writes |
 | Day AI | Canonical account/contact state | AM OAuth | Canonical writes after approval |
 
 ## Apollo Search Fields
@@ -42,6 +42,36 @@ When enrichment is approved, preserve:
 
 Selective enrichment is the default. Enrich AM-approved candidates or top-ranked candidates only.
 
+## Clearout Verification Fields
+
+When Clearout verification is approved, preserve:
+
+- Verification status.
+- Safe/risky/unknown style classification when returned.
+- Deliverability reason or sub-status when returned.
+- Verification timestamp.
+- Credits consumed when available.
+- Redacted raw verification snapshot.
+
+Clearout should verify selected or enriched candidate emails only. Do not bulk-verify every possible email by default.
+
+## New Contact Flow
+
+Use `/source-new-contacts` for admin-side net-new sourcing:
+
+```text
+account/domain
+  -> Apollo People Search
+  -> candidate ranking
+  -> selective Apollo enrichment
+  -> selective Clearout verification
+  -> AM/admin approval
+  -> /dedupe-contacts
+  -> Day AI People
+```
+
+This flow can produce candidate context, but canonical Day AI People are still created only after approval.
+
 ## Day AI Handoff
 
 Before creating Day AI People, the AM must approve selected candidates. The Day AI write receipt should include source provenance and enrichment state.
@@ -52,8 +82,7 @@ Example:
 Saved to Day AI:
 - Person: Jane Doe
 - Source: Apollo + AM approved
-- Email status: not enriched
+- Email status: not enriched / verified / risky / unknown
 - Source trail: title match, company domain match, Apollo person ID
 - Next step: enrich email or draft outreach after approval
 ```
-

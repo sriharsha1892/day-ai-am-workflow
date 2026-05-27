@@ -17,6 +17,7 @@ Optional:
 
 - Freshsales contacts/leads/accounts/deals/activities/conversations/notes.
 - Apollo candidate contacts when the admin-side Apollo provider is enabled.
+- Clearout verification state for candidate emails when available.
 - Imported active contacts from `account-packet.json` when present.
 - Day AI existing People, Organization relationships, Actions, Context, and Gmail history if available.
 - `workflow/config/packs.json` plus Day AI AM/account pack context.
@@ -53,6 +54,7 @@ AM chooses which candidates are useful and which ICP role bucket each selected c
 - Include `Imported active contact` for contacts supplied through AM package import.
 - Evidence/source trail.
 - Enrichment state: `not requested`, `requested`, `complete`, `failed`, or `not available`.
+- Email verification state when Clearout has verified an enriched/imported email.
 - ICP role fit based on the resolved persona pack.
 - Missing role gaps.
 - Suggested next shortcut: `/dedupe-contacts` for AM-selected contacts.

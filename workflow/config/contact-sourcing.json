@@ -8,7 +8,7 @@
       "purpose": "Existing CRM evidence, activity, account/contact/deal context"
     },
     "apollo": {
-      "enabled": false,
+      "enabled": true,
       "mode": "admin_only",
       "secretScope": "admin_local",
       "purpose": "Net-new contact sourcing and selective enrichment",
@@ -16,15 +16,17 @@
       "enrichmentPolicy": "selective_only"
     },
     "clearout": {
-      "enabled": false,
-      "mode": "verification_only",
+      "enabled": true,
+      "mode": "admin_only_verification",
       "secretScope": "admin_local",
-      "purpose": "Future email verification gate"
+      "purpose": "Selective email verification for enriched or imported candidate emails",
+      "verificationPolicy": "verify_selected_or_enriched_emails_only"
     }
   },
   "approvalRules": {
     "createDayAiPerson": "am_approval_required",
     "apolloEnrichment": "admin_or_credit_approval_required",
+    "clearoutVerification": "admin_or_credit_approval_required",
     "externalSend": "never_automatic"
   },
   "rawSnapshotPolicy": {

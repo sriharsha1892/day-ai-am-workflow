@@ -65,5 +65,5 @@ if (!foundMetadata) {
 
 console.log('\nNext step:');
 console.log('  - If grant_types_supported includes "client_credentials": use scripts/worker-dayai-onboard.mjs --client-credentials');
-console.log('  - If only "authorization_code": run scripts/worker-dayai-onboard.mjs and complete the browser flow once for myra-worker@ask-myra.ai');
+console.log('  - If only "authorization_code": run scripts/worker-dayai-onboard.mjs and complete the browser flow once for harsha@ask-myra.ai');
 console.log('  - If neither: open a ticket with Day AI for a service-account credential. Worker writes are blocked until resolved.');

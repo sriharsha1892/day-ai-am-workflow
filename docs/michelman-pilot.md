@@ -18,7 +18,7 @@ Michelman is a real specialty chemicals + coatings company with public web prese
    - `FRESHSALES_API_KEY`, `APOLLO_API_KEY`, `CLEAROUT_API_TOKEN`
    - `DAY_AI_CLIENT_ID` and either `DAY_AI_CLIENT_SECRET` (client_credentials) or a refresh token persisted by `worker:dayai-onboard`
    - `WORKER_BEARER_TOKENS` mapping `satya@ask-myra.ai:<token>`
-4. **Day AI auth probed**: run `npm run worker:dayai-probe` to confirm grant types supported. Then `npm run worker:dayai-onboard` to authenticate the `myra-worker@ask-myra.ai` integration user.
+4. **Day AI auth probed**: run `npm run worker:dayai-probe` to confirm grant types supported. Then `npm run worker:dayai-onboard` to authenticate the `harsha@ask-myra.ai` integration user.
 5. **`npm run validate:all`** passes.
 
 ## The 11 Steps (mirrors the chat plan)
@@ -74,6 +74,6 @@ The final receipt from step 11 must show:
 
 ## Post-pilot
 
-If receipt is Green: ramp to the next 5 P1 accounts on Satya's roster. Adi reviews the Day AI context page rendering and signs off on the worker for broader rollout.
+If receipt is Green: ramp to the next 5 P1 accounts on Satya's roster. You review the Day AI context page rendering and sign off on the worker for broader rollout.
 
 If receipt has any Red blocker: file the failure in the project's blocker doc and re-run the affected step after the underlying fix lands. Do not bypass the worker.

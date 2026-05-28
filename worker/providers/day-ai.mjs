@@ -1,4 +1,4 @@
-// Day AI provider. Single integration user (myra-worker@ask-myra.ai), OAuth refresh token.
+// Day AI provider. Single integration user (harsha@ask-myra.ai), OAuth refresh token.
 // Designed as a DayAiClient interface so a future service-account API key is a drop-in swap.
 //
 // In v1 the worker speaks MCP-over-HTTP to https://day.ai/api/mcp using the integration user.

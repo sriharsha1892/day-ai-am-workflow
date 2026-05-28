@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// One-time interactive onboarding for the Day AI integration user (myra-worker@ask-myra.ai).
+// One-time interactive onboarding for the Day AI integration user (harsha@ask-myra.ai).
 // Runs the authorization_code flow with PKCE in a tiny local HTTP server, captures the code,
 // exchanges it for tokens, and persists the refresh token to worker/.secrets/day-ai-refresh.json.
 //
@@ -29,7 +29,7 @@ const useClientCredentials = args['client-credentials'] === true || args['client
 
 if (!clientId) {
   process.stderr.write(
-    'Missing --client-id (or DAY_AI_CLIENT_ID in .env.local). Register myra-worker@ask-myra.ai as an OAuth client in Day AI first.\n',
+    'Missing --client-id (or DAY_AI_CLIENT_ID in .env.local). Register harsha@ask-myra.ai as an OAuth client in Day AI first.\n',
   );
   process.exit(1);
 }
@@ -88,7 +88,7 @@ async function runAuthorizationCode() {
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set('state', state);
 
-  console.log('Open this URL in a browser logged into myra-worker@ask-myra.ai:\n');
+  console.log('Open this URL in a browser logged into harsha@ask-myra.ai:\n');
   console.log(authUrl.toString());
   console.log('');
 

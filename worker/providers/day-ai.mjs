@@ -1,120 +1,76 @@
-// Day AI provider. Single integration user (harsha@ask-myra.ai), OAuth refresh token.
-// Designed as a DayAiClient interface so a future service-account API key is a drop-in swap.
+// Day AI provider. Speaks directly to Day AI MCP / OAuth endpoints using the
+// CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN issued by `yarn oauth:setup` in
+// github.com/day-ai/day-ai-sdk (dynamic OAuth client registration).
 //
-// In v1 the worker speaks MCP-over-HTTP to https://day.ai/api/mcp using the integration user.
-// Until the OAuth probe and onboarding are complete, the client is a "policy-only" stub that
-// rejects writes loudly and returns shape-compatible empty reads (so worker boots and probes work).
+// Env vars (set on Vercel + locally in ~/day-ai-sdk/.env):
+//   CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN — required
+//   DAY_AI_BASE_URL — defaults to https://day.ai
+//   WORKSPACE_ID — optional; SDK falls back to user's default workspace if unset
 
-import fs from 'node:fs';
-import path from 'node:path';
 import { lookupIdempotency, recordIdempotency } from '../store.mjs';
 
-const REFRESH_PATH = path.resolve('worker/.secrets/day-ai-refresh.json');
-
+const TOKEN_BUFFER_MS = 60_000;
 let tokenCache = null;
 
-function loadStoredTokens() {
-  // Vercel-friendly: prefer env-provided refresh JSON when present, fall back to disk for local dev.
-  const fromEnv = process.env.DAY_AI_REFRESH_JSON;
-  if (fromEnv) {
-    try {
-      return JSON.parse(fromEnv);
-    } catch {
-      return null;
-    }
-  }
-  if (!fs.existsSync(REFRESH_PATH)) return null;
-  try {
-    return JSON.parse(fs.readFileSync(REFRESH_PATH, 'utf8'));
-  } catch {
-    return null;
-  }
+function baseUrl() {
+  return (process.env.DAY_AI_BASE_URL ?? 'https://day.ai').replace(/\/+$/, '');
 }
 
-function tokensReady() {
-  const overrideToken = process.env.DAY_AI_INTEGRATION_TOKEN;
-  if (overrideToken) return true;
-  const stored = loadStoredTokens();
-  return Boolean(stored?.refresh_token || stored?.access_token);
+function credsReady() {
+  return Boolean(
+    process.env.CLIENT_ID && process.env.CLIENT_SECRET && process.env.REFRESH_TOKEN,
+  );
 }
 
 export async function probe() {
-  if (!tokensReady()) {
+  if (!credsReady()) {
     return {
       ok: false,
-      reason:
-        'No Day AI integration credentials. Run scripts/worker-dayai-probe.mjs and scripts/worker-dayai-onboard.mjs first.',
+      reason: 'Day AI credentials missing. Set CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN env vars.',
     };
   }
-  await ensureAccessToken();
-  return { ok: true };
+  try {
+    await ensureAccessToken();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error.message };
+  }
 }
 
 async function ensureAccessToken() {
-  const override = process.env.DAY_AI_INTEGRATION_TOKEN;
-  if (override) return override;
-
-  if (tokenCache && tokenCache.expiresAt > Date.now() + 30_000) {
+  if (tokenCache && tokenCache.expiresAt > Date.now() + TOKEN_BUFFER_MS) {
     return tokenCache.accessToken;
   }
 
-  const stored = loadStoredTokens();
-  if (!stored) throw new Error('Day AI integration credentials missing');
-
-  if (stored.grantType === 'client_credentials' || !stored.refresh_token) {
-    tokenCache = {
-      accessToken: stored.access_token,
-      expiresAt: stored.obtainedAt
-        ? new Date(stored.obtainedAt).getTime() + (stored.expires_in ?? 3600) * 1000
-        : Date.now() + 5 * 60 * 1000,
-    };
-    return tokenCache.accessToken;
-  }
-
-  // Refresh via refresh_token grant.
-  const clientId = process.env.DAY_AI_CLIENT_ID;
-  const clientSecret = process.env.DAY_AI_CLIENT_SECRET;
-  const tokenEndpoint = process.env.DAY_AI_TOKEN_ENDPOINT ?? `${process.env.DAY_AI_AUTH_BASE ?? 'https://day.ai'}/oauth/token`;
-  if (!clientId) throw new Error('Missing DAY_AI_CLIENT_ID for refresh');
-
-  const params = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: stored.refresh_token,
-    client_id: clientId,
-  });
-  if (clientSecret) params.set('client_secret', clientSecret);
-
-  const response = await fetch(tokenEndpoint, {
+  const response = await fetch(`${baseUrl()}/api/oauth`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params.toString(),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: process.env.CLIENT_ID,
+      client_secret: process.env.CLIENT_SECRET,
+      refresh_token: process.env.REFRESH_TOKEN,
+    }),
+    signal: AbortSignal.timeout(15_000),
   });
+
   if (!response.ok) {
-    throw new Error(`Day AI token refresh failed: ${response.status}`);
+    const text = await response.text();
+    throw new Error(`Day AI token refresh ${response.status}: ${text.slice(0, 200)}`);
   }
+
   const data = await response.json();
   const expiresIn = data.expires_in ?? 3600;
   tokenCache = {
     accessToken: data.access_token,
     expiresAt: Date.now() + expiresIn * 1000,
   };
-  if (data.refresh_token && data.refresh_token !== stored.refresh_token) {
-    fs.writeFileSync(
-      REFRESH_PATH,
-      JSON.stringify({ ...stored, refresh_token: data.refresh_token, obtainedAt: new Date().toISOString() }, null, 2),
-      { mode: 0o600 },
-    );
-    fs.chmodSync(REFRESH_PATH, 0o600);
-  }
   return tokenCache.accessToken;
 }
 
-async function dayAiCall(toolName, args) {
+async function mcpCallTool(toolName, args = {}) {
   const accessToken = await ensureAccessToken();
-  const mcpBase = process.env.DAY_AI_MCP_BASE ?? 'https://day.ai/api/mcp';
-  // MCP JSON-RPC over HTTP. Day AI's exact RPC shape is confirmed by scripts/worker-dayai-probe.mjs;
-  // this is the streamable-HTTP transport request shape per spec.
-  const response = await fetch(mcpBase, {
+  const response = await fetch(`${baseUrl()}/api/mcp`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -125,30 +81,53 @@ async function dayAiCall(toolName, args) {
       jsonrpc: '2.0',
       id: Math.floor(Math.random() * 1e9),
       method: 'tools/call',
-      params: { name: toolName, arguments: args ?? {} },
+      params: { name: toolName, arguments: args },
     }),
     signal: AbortSignal.timeout(30_000),
   });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`Day AI MCP ${toolName} returned ${response.status}: ${text.slice(0, 300)}`);
+    throw new Error(`Day AI MCP ${toolName} HTTP ${response.status}: ${text.slice(0, 300)}`);
   }
   const data = text ? JSON.parse(text) : {};
   if (data.error) {
     throw new Error(`Day AI MCP ${toolName} RPC error: ${JSON.stringify(data.error).slice(0, 300)}`);
   }
-  // MCP tool responses usually wrap content in `result.content[*].text` or `result.structuredContent`.
   return data.result ?? data;
 }
 
-export async function fetchDayAiOrgsByDomain(domain) {
-  if (!domain || !tokensReady()) return [];
+function parseMcpResult(result) {
+  if (!result) return null;
+  if (result.structuredContent) return result.structuredContent;
+  const text = result.content?.[0]?.text;
+  if (!text) return null;
   try {
-    const result = await dayAiCall('search_organizations', { domain });
-    return extractList(result, 'organizations').map((o) => ({
-      id: o.id,
-      name: o.name,
-      domain: o.domain ?? o.primaryDomain ?? domain,
+    return JSON.parse(text);
+  } catch {
+    return { _raw: text };
+  }
+}
+
+// ----- Reads -----
+
+export async function fetchDayAiOrgsByDomain(domain) {
+  if (!domain || !credsReady()) return [];
+  try {
+    const result = await mcpCallTool('search_objects', {
+      queries: [
+        {
+          objectType: 'native_organization',
+          where: { propertyId: 'domain', operator: 'eq', value: domain },
+        },
+      ],
+      propertiesToReturn: '*',
+    });
+    const parsed = parseMcpResult(result);
+    const list = parsed?.native_organization?.results ?? [];
+    return list.map((o) => ({
+      id: o.objectId,
+      name: o.title ?? o.properties?.name,
+      domain: o.properties?.domain ?? domain,
     }));
   } catch {
     return [];
@@ -156,65 +135,236 @@ export async function fetchDayAiOrgsByDomain(domain) {
 }
 
 export async function fetchDayAiOrgsByName(normalizedName) {
-  if (!normalizedName || !tokensReady()) return [];
+  if (!normalizedName || !credsReady()) return [];
   try {
-    const result = await dayAiCall('search_organizations', { name: normalizedName });
-    return extractList(result, 'organizations').map((o) => ({
-      id: o.id,
-      name: o.name,
-      domain: o.domain ?? o.primaryDomain,
+    const result = await mcpCallTool('search_objects', {
+      queries: [
+        {
+          objectType: 'native_organization',
+          where: { propertyId: 'name', operator: 'contains', value: normalizedName },
+        },
+      ],
+      propertiesToReturn: '*',
+    });
+    const parsed = parseMcpResult(result);
+    const list = parsed?.native_organization?.results ?? [];
+    return list.map((o) => ({
+      id: o.objectId,
+      name: o.title ?? o.properties?.name,
+      domain: o.properties?.domain,
     }));
   } catch {
     return [];
   }
 }
 
+// ----- Writes -----
+
+// Action verb -> { toolName, buildArgs(payload) }. Each handler shapes our
+// internal payload into the exact arguments Day AI's MCP tool expects.
+const WRITE_HANDLERS = {
+  'org-link': {
+    tool: null,
+    // Day AI doesn't have an explicit "link org" tool; linking is implicit when
+    // we pass `domain` to opportunity-create. So org-link is a no-op that just
+    // returns the existing org IDs we already found.
+    async run({ canonicalDomain, matchedDayAiOrgId }) {
+      return {
+        record: {
+          id: matchedDayAiOrgId ?? null,
+          name: canonicalDomain,
+          link: matchedDayAiOrgId ? `${baseUrl()}/organizations/${matchedDayAiOrgId}` : null,
+        },
+        type: 'organization',
+      };
+    },
+  },
+  'org-create': {
+    tool: 'create_or_update_person_organization',
+    args: (p) => ({
+      objectType: 'Organization',
+      domain: p.canonicalDomain,
+      name: p.accountName ?? p.canonicalDomain,
+    }),
+    type: 'organization',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.organization ?? parsed?.record ?? parsed;
+      return {
+        id: r?.objectId ?? r?.id,
+        name: r?.title ?? r?.name ?? p.accountName ?? p.canonicalDomain,
+        link: r?.objectId ? `${baseUrl()}/organizations/${r.objectId}` : null,
+      };
+    },
+  },
+  'opportunity-create': {
+    tool: 'create_or_update_opportunity',
+    args: (p) => ({
+      isCreating: true,
+      title: p.title ?? `${p.canonicalDomain} - Researching`,
+      domain: p.canonicalDomain,
+      stageId: p.stageId,
+      ownerEmail: p.ownerEmail ?? p.approvingAm,
+      expectedRevenue: p.expectedRevenue,
+      expectedCloseDate: p.expectedCloseDate,
+    }),
+    type: 'opportunity',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.opportunity ?? parsed?.record ?? parsed;
+      return {
+        id: r?.objectId ?? r?.id,
+        name: r?.title ?? p.title,
+        link: r?.objectId ? `${baseUrl()}/opportunities/${r.objectId}` : null,
+      };
+    },
+  },
+  'person-create': {
+    tool: 'create_or_update_person_organization',
+    args: (p) => {
+      const candidate = p.candidate ?? p;
+      return {
+        objectType: 'Person',
+        email: candidate.email,
+        firstName: candidate.firstName ?? candidate.name?.split(' ')[0],
+        lastName: candidate.lastName ?? candidate.name?.split(' ').slice(1).join(' '),
+        jobTitle: candidate.title ?? candidate.jobTitle,
+        linkedInUrl: candidate.linkedinUrl ?? candidate.linkedInUrl,
+        phoneNumbers: candidate.phone ? [candidate.phone] : undefined,
+      };
+    },
+    type: 'person',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.person ?? parsed?.record ?? parsed;
+      const email = p.candidate?.email ?? p.email;
+      return {
+        id: r?.objectId ?? email,
+        name: r?.title ?? (`${p.candidate?.firstName ?? ''} ${p.candidate?.lastName ?? ''}`.trim() || email),
+        link: r?.objectId ? `${baseUrl()}/people/${r.objectId}` : null,
+      };
+    },
+  },
+  'person-dedupe-check': {
+    tool: 'search_objects',
+    args: (p) => ({
+      queries: (p.candidates ?? []).map((c) => ({
+        objectType: 'native_contact',
+        where: { propertyId: 'email', operator: 'eq', value: c.email },
+      })),
+      propertiesToReturn: '*',
+    }),
+    type: 'page',
+    extractRecord: (parsed, p) => {
+      const matches = parsed?.native_contact?.results ?? [];
+      return {
+        id: `dedupe-${p.canonicalDomain}-${Date.now()}`,
+        name: `Dedupe check: ${matches.length} existing match(es) of ${p.candidates?.length ?? 0} candidates`,
+        matches,
+        link: null,
+      };
+    },
+  },
+  'action-create': {
+    tool: 'create_or_update_action',
+    args: (p) => ({
+      title: p.summary ?? p.title ?? 'Follow-up',
+      description: p.description ?? p.summary,
+      dueAt: p.dueAt,
+      assigneeEmail: p.assigneeEmail ?? p.approvingAm,
+      relatedContactEmail: p.contactEmail,
+      relatedOpportunityDomain: p.canonicalDomain,
+      channel: p.channel,
+    }),
+    type: 'action',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.action ?? parsed?.record ?? parsed;
+      return {
+        id: r?.objectId ?? r?.id,
+        name: r?.title ?? p.summary,
+        link: r?.objectId ? `${baseUrl()}/actions/${r.objectId}` : null,
+      };
+    },
+  },
+  'draft-create': {
+    tool: 'create_email_draft',
+    args: (p) => ({
+      to: p.contactEmail ?? p.to,
+      subject: p.subject,
+      body: p.bodyHtml ?? p.body,
+      relatedOpportunityDomain: p.canonicalDomain,
+    }),
+    type: 'draft',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.draft ?? parsed?.record ?? parsed;
+      return {
+        id: r?.objectId ?? r?.id,
+        name: r?.title ?? p.subject,
+        link: r?.objectId ? `${baseUrl()}/drafts/${r.objectId}` : null,
+      };
+    },
+  },
+  'review-context': {
+    tool: 'create_or_update_workspace_context',
+    args: (p) => ({
+      title: p.summary ?? p.title ?? 'Review required',
+      content: p.reason ?? p.bodyMarkdown ?? '',
+      relatedOrganizationDomain: p.canonicalDomain,
+    }),
+    type: 'page',
+    extractRecord: (parsed, p) => {
+      const r = parsed?.context ?? parsed?.record ?? parsed;
+      return {
+        id: r?.objectId ?? `review-${p.canonicalDomain}-${Date.now()}`,
+        name: r?.title ?? p.summary ?? 'Review context',
+        link: r?.objectId ? `${baseUrl()}/contexts/${r.objectId}` : null,
+      };
+    },
+  },
+};
+
 export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempotencyKey, retry, ...rest }) {
   if (!approvingAm) throw new Error('approvingAm required for Day AI writes');
   if (!idempotencyKey) throw new Error('idempotencyKey required for Day AI writes');
 
-  // Idempotency check first.
   const prior = await lookupIdempotency(idempotencyKey);
   if (prior && !retry) {
-    return {
-      ok: true,
-      replayed: true,
-      action,
-      ...prior,
-    };
+    return { ok: true, replayed: true, action, ...prior };
   }
   if (prior && retry) {
-    // Retry: reuse the same record; just verify it still exists. Here we trust prior.
-    return {
-      ok: true,
-      replayed: true,
-      retried: true,
-      action,
-      ...prior,
-    };
+    return { ok: true, replayed: true, retried: true, action, ...prior };
   }
 
-  if (!tokensReady()) {
-    throw new Error('Day AI integration credentials missing; run worker-dayai-onboard first.');
+  if (!credsReady()) {
+    throw new Error('Day AI credentials missing; set CLIENT_ID / CLIENT_SECRET / REFRESH_TOKEN.');
   }
 
-  const tool = TOOL_MAP[action];
-  if (!tool) throw new Error(`Unknown Day AI write action: ${action}`);
+  const handler = WRITE_HANDLERS[action];
+  if (!handler) throw new Error(`Unknown Day AI write action: ${action}`);
 
-  const args = buildArgs(action, { approvingAm, canonicalDomain, idempotencyKey, ...rest });
-  const result = await dayAiCall(tool, args);
-  const record = extractRecord(action, result);
+  const payload = { approvingAm, canonicalDomain, idempotencyKey, ...rest };
+  let record;
+  let type;
+  if (handler.run) {
+    const out = await handler.run(payload);
+    record = out.record;
+    type = out.type;
+  } else {
+    const result = await mcpCallTool(handler.tool, handler.args(payload));
+    const parsed = parseMcpResult(result);
+    record = handler.extractRecord(parsed, payload);
+    type = handler.type;
+  }
+
   if (!record?.id) {
-    throw new Error(`Day AI ${tool} returned no record ID`);
+    throw new Error(`Day AI ${handler.tool ?? action} returned no record ID`);
   }
 
   const persisted = {
-    type: typeFor(action),
+    type,
     id: record.id,
     name: record.name,
-    link: record.link ?? record.url,
+    link: record.link,
     idempotencyKey,
     approvingAm,
+    canonicalDomain,
     writtenAt: new Date().toISOString(),
   };
   await recordIdempotency(idempotencyKey, persisted);
@@ -223,123 +373,17 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
 }
 
 export async function writeDayAiContextPage({ canonicalDomain, organizationId, title, bodyMarkdown, approvingAm }) {
-  if (!tokensReady()) throw new Error('Day AI integration credentials missing');
-  const result = await dayAiCall('create_context_page', {
-    organizationId,
-    canonicalDomain,
+  if (!credsReady()) throw new Error('Day AI credentials missing');
+  const result = await mcpCallTool('create_or_update_workspace_context', {
     title,
-    bodyMarkdown,
-    approvingAmEmail: approvingAm,
+    content: bodyMarkdown,
+    relatedOrganizationDomain: canonicalDomain,
+    relatedOrganizationId: organizationId,
   });
-  const page = extractRecord('page-create', result);
+  const parsed = parseMcpResult(result);
+  const r = parsed?.context ?? parsed?.record ?? parsed;
   return {
-    pageId: page?.id,
-    link: page?.link ?? page?.url,
+    pageId: r?.objectId ?? null,
+    link: r?.objectId ? `${baseUrl()}/contexts/${r.objectId}` : null,
   };
-}
-
-const TOOL_MAP = {
-  'org-link': 'link_organization',
-  'org-create': 'create_organization',
-  'opportunity-create': 'create_opportunity',
-  'person-dedupe-check': 'search_people',
-  'person-create': 'create_person',
-  'action-create': 'create_action',
-  'draft-create': 'create_draft',
-  'review-context': 'create_context_page',
-};
-
-function typeFor(action) {
-  if (action.startsWith('org-')) return 'organization';
-  if (action === 'opportunity-create') return 'opportunity';
-  if (action.startsWith('person-')) return 'person';
-  if (action === 'action-create') return 'action';
-  if (action === 'draft-create') return 'draft';
-  if (action === 'review-context') return 'page';
-  return 'unknown';
-}
-
-function buildArgs(action, payload) {
-  const base = {
-    canonicalDomain: payload.canonicalDomain,
-    idempotencyKey: payload.idempotencyKey,
-    approvingAmEmail: payload.approvingAm,
-  };
-  if (action === 'org-link') {
-    return { ...base, dayAiOrganizationId: payload.matchedDayAiOrgId, matchEvidence: payload.matchEvidence };
-  }
-  if (action === 'org-create') {
-    return { ...base, name: payload.accountName, packet: payload.packet };
-  }
-  if (action === 'opportunity-create') {
-    return { ...base, stage: payload.stage ?? 'Researching' };
-  }
-  if (action === 'person-dedupe-check') {
-    return { ...base, candidates: payload.candidates ?? [] };
-  }
-  if (action === 'person-create') {
-    return { ...base, candidate: payload.candidate };
-  }
-  if (action === 'action-create') {
-    return {
-      ...base,
-      contactEmail: payload.contactEmail,
-      channel: payload.channel,
-      dueAt: payload.dueAt,
-      summary: payload.summary,
-      branchIf: payload.branchIf,
-    };
-  }
-  if (action === 'draft-create') {
-    return {
-      ...base,
-      contactEmail: payload.contactEmail,
-      linkedActionId: payload.linkedActionId,
-      subject: payload.subject,
-      bodyHtml: payload.bodyHtml,
-      tone: payload.tone,
-      cta: payload.cta,
-      length: payload.length,
-      personaPack: payload.personaPack,
-      channelPack: payload.channelPack,
-    };
-  }
-  if (action === 'review-context') {
-    return { ...base, title: payload.summary ?? 'Review required', bodyMarkdown: payload.reason ?? '' };
-  }
-  return base;
-}
-
-function extractList(result, key) {
-  if (!result) return [];
-  if (Array.isArray(result[key])) return result[key];
-  if (result.structuredContent?.[key]) return result.structuredContent[key];
-  // MCP often returns content as a single text block containing JSON.
-  const text = result.content?.[0]?.text;
-  if (text) {
-    try {
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed[key])) return parsed[key];
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      /* ignore */
-    }
-  }
-  return [];
-}
-
-function extractRecord(action, result) {
-  if (!result) return null;
-  if (result.id) return result;
-  if (result.structuredContent) return result.structuredContent;
-  const text = result.content?.[0]?.text;
-  if (text) {
-    try {
-      const parsed = JSON.parse(text);
-      return parsed.record ?? parsed;
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }

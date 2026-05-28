@@ -8,7 +8,7 @@ import {
 } from './providers/freshsales.mjs';
 import { apolloPeopleSearch } from './providers/apollo.mjs';
 import { writeDayAiContextPage } from './providers/day-ai.mjs';
-import { getStore } from './store.mjs';
+import { getIdempotencyForAccount, pendingForAccount } from './store.mjs';
 
 const COLOR_RANK = { green: 0, yellow: 1, red: 2 };
 
@@ -22,11 +22,10 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
   ]);
 
   // 2. Pull idempotency-store records for this account (proves Day AI writes happened).
-  const store = getStore();
-  const accountRecords = [...store.idempotency.values()].filter(
-    (v) => v.idempotencyKey?.includes(canonicalDomain),
-  );
-  const pendingSync = store.pending.filter((e) => e.canonicalDomain === canonicalDomain);
+  const [accountRecords, pendingSync] = await Promise.all([
+    getIdempotencyForAccount(canonicalDomain),
+    pendingForAccount(canonicalDomain),
+  ]);
 
   // 3. Build provider blocks.
   const freshsalesBlock = freshsales

@@ -103,7 +103,7 @@ app.post('/v1/day-ai/write', async (c) => {
     const result = await dayAiWrite({ ...body, approvingAm });
     return c.json({ ok: true, ...result });
   } catch (error) {
-    queuePendingSync({
+    await queuePendingSync({
       canonicalDomain: body.canonicalDomain,
       attemptedWrite: body.action,
       idempotencyKey: body.idempotencyKey,
@@ -127,7 +127,7 @@ app.post('/v1/day-ai/write', async (c) => {
 
 app.post('/v1/day-ai/lookup-idempotency', async (c) => {
   const body = await c.req.json();
-  const prior = lookupIdempotency(body.idempotencyKey);
+  const prior = await lookupIdempotency(body.idempotencyKey);
   return c.json({ ok: true, prior });
 });
 

@@ -7,7 +7,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getStore, recordIdempotency } from '../store.mjs';
+import { lookupIdempotency, recordIdempotency } from '../store.mjs';
 
 const REFRESH_PATH = path.resolve('worker/.secrets/day-ai-refresh.json');
 
@@ -174,8 +174,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
   if (!idempotencyKey) throw new Error('idempotencyKey required for Day AI writes');
 
   // Idempotency check first.
-  const store = getStore();
-  const prior = store.idempotency.get(idempotencyKey);
+  const prior = await lookupIdempotency(idempotencyKey);
   if (prior && !retry) {
     return {
       ok: true,
@@ -218,7 +217,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
     approvingAm,
     writtenAt: new Date().toISOString(),
   };
-  recordIdempotency(idempotencyKey, persisted);
+  await recordIdempotency(idempotencyKey, persisted);
 
   return { ok: true, action, ...persisted, raw: record };
 }

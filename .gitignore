@@ -9,3 +9,4 @@ worker/.env
 worker/.secrets/
 worker/data/
 am-package/
+.tokens/

@@ -42,11 +42,13 @@
     "worker:dayai-probe": "node scripts/worker-dayai-probe.mjs",
     "worker:dayai-onboard": "node scripts/worker-dayai-onboard.mjs",
     "michelman:pilot": "node scripts/michelman-pilot.mjs",
+    "issue-am-token": "node scripts/issue-am-token.mjs",
     "test:all": "node scripts/tests/run-all.mjs",
     "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:workflow-configs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import && npm run check:org-duplicates && npm run validate:tour-run-state"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",
+    "@upstash/redis": "^1.38.0",
     "hono": "^4.6.0"
   }
 }

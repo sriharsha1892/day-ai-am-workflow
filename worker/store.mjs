@@ -1,36 +1,129 @@
-// Worker store. Disk-backed JSON in v1 (worker/data/*.json) — protects against duplicate Day AI
-// Organization creation on retry. Idempotency-key -> { type, id, name, link, approvingAm, writtenAt }.
-// Pending-sync queue persists across worker restarts so AMs can retry after recovery.
-// Swap to Postgres later by replacing this module.
+// Worker store. Two backends:
+//   1. Upstash Redis (used when KV_REST_API_URL + KV_REST_API_TOKEN are present — set
+//      automatically when you provision Vercel KV or wire up Upstash directly).
+//   2. Disk-backed JSON in worker/data/*.json (local dev fallback; auto-/tmp on Vercel).
+//
+// Redis layout:
+//   idem:{key}                  -> JSON value (30 day TTL)
+//   account-keys:{domain}       -> SET of idempotency keys for that domain
+//   pending:{domain}            -> LIST of pending-sync entries (newest at tail)
+//
+// Public API (all async):
+//   recordIdempotency(key, value)
+//   lookupIdempotency(key)
+//   getIdempotencyForAccount(canonicalDomain) -> array of stored values
+//   queuePendingSync(entry)               // entry.canonicalDomain required
+//   pendingForAccount(canonicalDomain)    -> array
+//   drainPendingByKey(idempotencyKey)
+//
+// The disk fallback writes via a queued promise chain so concurrent calls don't
+// step on each other; the Redis backend uses Upstash's REST API which is naturally
+// atomic per command.
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { Redis } from '@upstash/redis';
 
-let store = null;
-let storeDir = null;
-let idempotencyPath = null;
-let pendingPath = null;
-let writeQueue = Promise.resolve();
+const IDEM_TTL_SECONDS = 30 * 86_400;
 
-function init() {
-  if (store) return;
-  // Vercel: filesystem is read-only except /tmp. Fall back automatically.
-  const requested = process.env.WORKER_STORE_DIR ?? (process.env.VERCEL ? '/tmp/myra-worker-store' : 'worker/data');
-  storeDir = path.resolve(requested);
-  fs.mkdirSync(storeDir, { recursive: true });
-  idempotencyPath = path.join(storeDir, 'idempotency.json');
-  pendingPath = path.join(storeDir, 'pending-sync.json');
+let backend = null;
+
+function pickBackend() {
+  if (backend) return backend;
+
+  const kvUrl = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const kvToken = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
+
+  if (kvUrl && kvToken) {
+    backend = createRedisBackend(kvUrl, kvToken);
+  } else {
+    backend = createDiskBackend();
+  }
+  return backend;
+}
+
+function createRedisBackend(url, token) {
+  const redis = new Redis({ url, token });
+  return {
+    kind: 'redis',
+    async recordIdempotency(key, value) {
+      const domain = extractDomain(key, value);
+      const payload = JSON.stringify(value);
+      // Pipeline: set the value with TTL and add the key to the account's set.
+      await Promise.all([
+        redis.set(`idem:${key}`, payload, { ex: IDEM_TTL_SECONDS }),
+        domain ? redis.sadd(`account-keys:${domain}`, key) : Promise.resolve(),
+      ]);
+    },
+    async lookupIdempotency(key) {
+      const raw = await redis.get(`idem:${key}`);
+      if (!raw) return undefined;
+      return typeof raw === 'string' ? JSON.parse(raw) : raw;
+    },
+    async getIdempotencyForAccount(canonicalDomain) {
+      if (!canonicalDomain) return [];
+      const keys = await redis.smembers(`account-keys:${canonicalDomain}`);
+      if (!keys || keys.length === 0) return [];
+      const values = await redis.mget(...keys.map((k) => `idem:${k}`));
+      return values
+        .map((v) => (typeof v === 'string' ? JSON.parse(v) : v))
+        .filter(Boolean);
+    },
+    async queuePendingSync(entry) {
+      const domain = entry.canonicalDomain ?? 'no-domain';
+      await redis.rpush(`pending:${domain}`, JSON.stringify(entry));
+    },
+    async pendingForAccount(canonicalDomain) {
+      if (!canonicalDomain) return [];
+      const raw = await redis.lrange(`pending:${canonicalDomain}`, 0, -1);
+      return raw
+        .map((v) => (typeof v === 'string' ? JSON.parse(v) : v))
+        .filter(Boolean);
+    },
+    async drainPendingByKey(idempotencyKey) {
+      // Redis lrem requires the exact stringified value. Scan only the keys we know about.
+      // For pilot scale we can afford to scan all pending:* lists; in production we'd
+      // index pending entries by idempotency key directly.
+      const cursor = '0';
+      const seenDomains = new Set();
+      let nextCursor = cursor;
+      do {
+        const result = await redis.scan(nextCursor, { match: 'pending:*', count: 100 });
+        nextCursor = String(result[0] ?? '0');
+        for (const key of result[1] ?? []) {
+          const domain = key.replace(/^pending:/, '');
+          if (seenDomains.has(domain)) continue;
+          seenDomains.add(domain);
+          const entries = await redis.lrange(key, 0, -1);
+          for (const raw of entries) {
+            const entry = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (entry?.idempotencyKey === idempotencyKey) {
+              await redis.lrem(key, 1, raw);
+            }
+          }
+        }
+      } while (nextCursor !== '0');
+    },
+  };
+}
+
+function createDiskBackend() {
+  const root = path.resolve(
+    process.env.WORKER_STORE_DIR ?? (process.env.VERCEL ? '/tmp/myra-worker-store' : 'worker/data'),
+  );
+  fs.mkdirSync(root, { recursive: true });
+  const idemPath = path.join(root, 'idempotency.json');
+  const pendingPath = path.join(root, 'pending-sync.json');
 
   const idempotency = new Map();
-  if (fs.existsSync(idempotencyPath)) {
+  if (fs.existsSync(idemPath)) {
     try {
-      const data = JSON.parse(fs.readFileSync(idempotencyPath, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(idemPath, 'utf8'));
       for (const [k, v] of Object.entries(data)) idempotency.set(k, v);
     } catch {
       /* ignore corrupt store */
     }
   }
-
   let pending = [];
   if (fs.existsSync(pendingPath)) {
     try {
@@ -40,53 +133,87 @@ function init() {
     }
   }
 
-  store = { idempotency, pending };
+  let writeQueue = Promise.resolve();
+  const enqueue = (fn) => {
+    writeQueue = writeQueue.then(fn).catch((error) => {
+      process.stderr.write(`[worker/store] disk write failed: ${error.message}\n`);
+    });
+    return writeQueue;
+  };
+
+  const flushIdem = () =>
+    enqueue(async () => {
+      fs.writeFileSync(idemPath, JSON.stringify(Object.fromEntries(idempotency), null, 2));
+    });
+
+  const flushPending = () =>
+    enqueue(async () => {
+      fs.writeFileSync(pendingPath, JSON.stringify(pending, null, 2));
+    });
+
+  return {
+    kind: 'disk',
+    async recordIdempotency(key, value) {
+      idempotency.set(key, value);
+      await flushIdem();
+    },
+    async lookupIdempotency(key) {
+      return idempotency.get(key);
+    },
+    async getIdempotencyForAccount(canonicalDomain) {
+      if (!canonicalDomain) return [];
+      return [...idempotency.values()].filter((v) =>
+        v.idempotencyKey?.includes(canonicalDomain),
+      );
+    },
+    async queuePendingSync(entry) {
+      pending.push(entry);
+      await flushPending();
+    },
+    async pendingForAccount(canonicalDomain) {
+      if (!canonicalDomain) return [...pending];
+      return pending.filter((e) => e.canonicalDomain === canonicalDomain);
+    },
+    async drainPendingByKey(idempotencyKey) {
+      pending = pending.filter((e) => e.idempotencyKey !== idempotencyKey);
+      await flushPending();
+    },
+  };
 }
 
-export function getStore() {
-  init();
-  return store;
+function extractDomain(key, value) {
+  if (value?.canonicalDomain) return value.canonicalDomain;
+  // Fallback: idempotency keys have shape "<verb>.<domain>.<date>.<hash>"
+  const parts = String(key).split('.');
+  if (parts.length >= 4) return parts.slice(1, -2).join('.');
+  return null;
 }
 
-export function recordIdempotency(key, value) {
-  init();
-  store.idempotency.set(key, value);
-  enqueueWrite(persistIdempotency);
+// Public API — async wrappers over the chosen backend.
+export async function recordIdempotency(key, value) {
+  return pickBackend().recordIdempotency(key, value);
 }
 
-export function lookupIdempotency(key) {
-  init();
-  return store.idempotency.get(key);
+export async function lookupIdempotency(key) {
+  return pickBackend().lookupIdempotency(key);
 }
 
-export function queuePendingSync(entry) {
-  init();
-  store.pending.push(entry);
-  enqueueWrite(persistPending);
+export async function getIdempotencyForAccount(canonicalDomain) {
+  return pickBackend().getIdempotencyForAccount(canonicalDomain);
 }
 
-export function drainPendingByKey(key) {
-  init();
-  store.pending = store.pending.filter((e) => e.idempotencyKey !== key);
-  enqueueWrite(persistPending);
+export async function queuePendingSync(entry) {
+  return pickBackend().queuePendingSync(entry);
 }
 
-export function pendingForAccount(canonicalDomain) {
-  init();
-  return store.pending.filter((e) => e.canonicalDomain === canonicalDomain);
+export async function pendingForAccount(canonicalDomain) {
+  return pickBackend().pendingForAccount(canonicalDomain);
 }
 
-function enqueueWrite(fn) {
-  writeQueue = writeQueue.then(fn).catch((error) => {
-    process.stderr.write(`[worker/store] write failed: ${error.message}\n`);
-  });
+export async function drainPendingByKey(idempotencyKey) {
+  return pickBackend().drainPendingByKey(idempotencyKey);
 }
 
-async function persistIdempotency() {
-  const obj = Object.fromEntries(store.idempotency);
-  fs.writeFileSync(idempotencyPath, JSON.stringify(obj, null, 2));
-}
-
-async function persistPending() {
-  fs.writeFileSync(pendingPath, JSON.stringify(store.pending, null, 2));
+export function backendKind() {
+  return pickBackend().kind;
 }

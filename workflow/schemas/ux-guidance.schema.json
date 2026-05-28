@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/ux-guidance.schema.json",
+  "title": "myRA AM UX Guidance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "defaultTourMode",
+    "tourModes",
+    "firstRunStations",
+    "naturalPromptRoutes",
+    "receiptLevels",
+    "trustPanel",
+    "contactCardTiers",
+    "pendingSync",
+    "adminReadiness",
+    "unifiedReceipt",
+    "renderingMode",
+    "coachingDepth",
+    "contactSelection",
+    "endOfTour"
+  ],
+  "properties": {
+    "version": { "type": "string" },
+    "defaultTourMode": { "enum": ["beginner", "standard", "power"] },
+    "tourModes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["beginner", "standard", "power"],
+      "properties": {
+        "beginner": { "$ref": "#/$defs/tourMode" },
+        "standard": { "$ref": "#/$defs/tourMode" },
+        "power": { "$ref": "#/$defs/tourMode" }
+      }
+    },
+    "firstRunStations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/station" },
+      "minItems": 1
+    },
+    "naturalPromptRoutes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["examples", "route"],
+        "properties": {
+          "examples": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+          "route": { "type": "string" }
+        }
+      },
+      "minItems": 1
+    },
+    "receiptLevels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["green", "yellow", "red"],
+      "properties": {
+        "green": { "$ref": "#/$defs/receiptLevel" },
+        "yellow": { "$ref": "#/$defs/receiptLevel" },
+        "red": { "$ref": "#/$defs/receiptLevel" }
+      }
+    },
+    "trustPanel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredAfter", "sections"],
+      "properties": {
+        "requiredAfter": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "sections": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "contactCardTiers": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "required": ["recommended", "maybe", "hold"]
+    },
+    "pendingSync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statusLabel", "requiredFields", "retryPrompt"],
+      "properties": {
+        "statusLabel": { "type": "string" },
+        "requiredFields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "retryPrompt": { "type": "string" }
+      }
+    },
+    "adminReadiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checks"],
+      "properties": {
+        "checks": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "unifiedReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaRef", "defaultExpandedEvidence", "autoExpandOnYellowOrRed"],
+      "properties": {
+        "schemaRef": { "type": "string" },
+        "defaultExpandedEvidence": { "type": "boolean" },
+        "autoExpandOnYellowOrRed": { "type": "boolean" },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["localPathTemplate", "dayAiContextPage"],
+          "properties": {
+            "localPathTemplate": { "type": "string" },
+            "dayAiContextPage": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "renderingMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["narrative", "providerBullets"],
+      "properties": {
+        "narrative": { "type": "boolean" },
+        "providerBullets": { "type": "boolean" },
+        "suppressNarrativeInPowerMode": { "type": "boolean" }
+      }
+    },
+    "coachingDepth": {
+      "enum": ["decision_only", "decision_plus_headline_reason", "decision_plus_reason_plus_alternatives", "adaptive"]
+    },
+    "contactSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["defaultFlow", "powerEscape"],
+      "properties": {
+        "defaultFlow": {
+          "enum": ["bulk_with_veto_then_walk_maybe", "one_at_a_time", "numbered_only"]
+        },
+        "powerEscape": {
+          "enum": ["numbered_list_anywhere", "natural_language_only", "disabled"]
+        },
+        "autoApproveTier": { "enum": ["recommended", "none"] },
+        "walkTier": { "enum": ["maybe", "all"] },
+        "skipTier": { "enum": ["hold", "none"] }
+      }
+    },
+    "endOfTour": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triggers", "format"],
+      "properties": {
+        "triggers": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "format": {
+          "enum": ["brief_summary_plus_pending_plus_next_session_prompt", "brief_only", "detailed_digest", "none"]
+        },
+        "writeDigest": { "type": "boolean" },
+        "digestPathTemplate": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "tourMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "useWhen", "behavior"],
+      "properties": {
+        "label": { "type": "string" },
+        "useWhen": { "type": "string" },
+        "behavior": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "station": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "goal", "primaryShortcut"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "goal": { "type": "string" },
+        "primaryShortcut": { "type": "string" }
+      }
+    },
+    "receiptLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "meaning", "examples"],
+      "properties": {
+        "label": { "type": "string" },
+        "meaning": { "type": "string" },
+        "examples": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

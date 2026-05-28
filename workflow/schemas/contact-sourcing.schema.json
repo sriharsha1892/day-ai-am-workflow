@@ -18,6 +18,19 @@
         "fallbackWhenUnavailable": { "type": "string" }
       }
     },
+    "leadIdentificationOrder": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "imported_active_contacts",
+          "apollo_search",
+          "freshsales_mi_evidence",
+          "day_ai_existing_people",
+          "clearout_selected_verification"
+        ]
+      },
+      "minItems": 1
+    },
     "providers": {
       "type": "object",
       "additionalProperties": false,

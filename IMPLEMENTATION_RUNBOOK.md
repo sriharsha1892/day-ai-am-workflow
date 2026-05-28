@@ -63,6 +63,33 @@ npm run validate:packs
 
 Commands resolve packs from global defaults, Day AI AM profile context, Day AI account context, then ask the AM once if still missing.
 
+### myRA Context And Org Resolution
+
+Every account, contact, cadence, outreach, demo, trial, product update, and health recommendation must load:
+
+```text
+workflow/config/myra-context.json
+```
+
+The duplicate-safe Organization match gate lives in:
+
+```text
+workflow/config/org-resolution.json
+```
+
+The AM UX rules live in:
+
+```text
+workflow/config/ux-guidance.json
+```
+
+Validate both with:
+
+```bash
+npm run validate:workflow-configs
+npm run check:org-duplicates
+```
+
 ## 2. Configure Day AI Objects
 
 Create or confirm these Day AI concepts exist:
@@ -95,9 +122,20 @@ Recommended custom fields:
 ### Organization
 
 - `primary_domain`
+- `canonical_domain`
+- `domain_aliases`
 - `aliases`
 - `parent_company`
+- `parent_org_candidate`
 - `freshsales_account_ids`
+- `apollo_organization_id`
+- `match_status`
+- `match_confidence`
+- `matched_day_ai_org_id`
+- `candidate_orgs`
+- `match_evidence`
+- `admin_review_required`
+- `idempotency_key`
 - `research_status`
 - `signal_summary`
 - `next_best_action`
@@ -136,6 +174,8 @@ owner_email:
 Then run the workflow in this order:
 
 ```text
+Start my myRA AM tour in beginner mode
+/org-resolution account_name="..." domain="..."
 /account-intake account_name="..." domain="..."
 /research-account domain="..."
 /map-contacts domain="..." aliases="..."
@@ -207,11 +247,14 @@ npm run provision:assignments:preview
 
 Run the generated commands from a fresh Codex session in this workspace. This creates account intake shells through the normal slash-command flow and preserves approval guardrails.
 
+Do not create a Day AI Organization when `/org-resolution` returns an ambiguous match. Create review context/action only.
+
 ## 4. Approval Rules During Pilot
 
 Automation may create:
 
 - Day AI account shell.
+- Duplicate-review context/action when org resolution is ambiguous.
 - Research/account context.
 - Account plan page.
 - Internal tasks.
@@ -253,6 +296,10 @@ Run 5-10 accounts through the workflow. The pilot is successful when:
 - AMs can start from account name + domain.
 - Research output is useful before outreach.
 - Freshsales contact matching works despite messy account names.
+- Duplicate-safe org resolution links exact domains, asks on parent/subsidiary ambiguity, and blocks ambiguous creates.
+- AMs can use natural prompts without knowing slash commands.
+- The workbook shows Command Cards, Trust Panel, Contact Cards, and Admin Readiness.
+- Day AI write failures show `pending_sync` with retry prompt and idempotency key.
 - AMs can select useful contacts before canonicalization.
 - Day AI contains selected contacts, tasks, drafts, and account context.
 - Outreach stats reflect Day AI ledger activity only.

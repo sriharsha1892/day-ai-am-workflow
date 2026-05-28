@@ -1,0 +1,165 @@
+// Freshsales provider. Read-only. Lifts scripts/freshsales-probe.mjs auth pattern.
+// Worker is the only place Freshsales credentials live. AMs never see them.
+
+const orgDomainEnv = () => process.env.FRESHSALES_ORG_DOMAIN ?? 'mordorintelligence';
+const apiKeyEnv = () => process.env.FRESHSALES_API_KEY;
+
+function tenantBase() {
+  return `https://${orgDomainEnv()}.freshsales.io`;
+}
+
+function authHeaders() {
+  const key = apiKeyEnv();
+  if (!key) throw new Error('Missing FRESHSALES_API_KEY');
+  return {
+    Authorization: `Token token=${key}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function freshsalesFetch(path, options = {}) {
+  const url = new URL(path, tenantBase());
+  const response = await fetch(url, {
+    method: options.method ?? 'GET',
+    headers: {
+      ...authHeaders(),
+      Connection: 'close',
+      ...(options.headers ?? {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    signal: AbortSignal.timeout(8_000),
+    keepalive: false,
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const err = new Error(`Freshsales ${response.status}: ${safeMessage(text)}`);
+    err.status = response.status;
+    throw err;
+  }
+  return text ? JSON.parse(text) : {};
+}
+
+export async function probe() {
+  const owners = await freshsalesFetch('/api/selector/owners');
+  const dealStages = await freshsalesFetch('/api/selector/deal_stages');
+  const fields = await freshsalesFetch('/api/settings/contacts/fields');
+  return {
+    ok: true,
+    tenant: tenantBase(),
+    counts: {
+      owners: Array.isArray(owners?.users) ? owners.users.length : 0,
+      dealStages: Array.isArray(dealStages?.deal_stages) ? dealStages.deal_stages.length : 0,
+      contactFields: Array.isArray(fields?.fields) ? fields.fields.length : 0,
+    },
+  };
+}
+
+export async function fetchFreshsalesAccountsByDomain(domain) {
+  if (!domain) return [];
+  // Freshsales universal lookup endpoint. Fast, no view-ID dependency.
+  try {
+    const data = await freshsalesFetch(
+      `/api/lookup?q=${encodeURIComponent(domain)}&f=website&entities=sales_account`,
+    );
+    // Freshsales lookup returns { sales_accounts: { sales_accounts: [...] } } (nested).
+    const list = data?.sales_accounts?.sales_accounts ?? data?.sales_accounts ?? [];
+    return list.map((acct) => ({
+      id: acct.id,
+      name: acct.name,
+      domain: acct.website ?? domain,
+      owner: acct.owner_id,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchContactsForAccount(accountId, limit) {
+  try {
+    // Universal lookup also works for contacts; filter via sales_account_id include.
+    const data = await freshsalesFetch(
+      `/api/sales_accounts/${accountId}?include=contacts`,
+    );
+    const list = data?.sales_account?.contacts ?? data?.contacts ?? [];
+    return list.slice(0, limit).map((c) => ({
+      id: c.id,
+      name: c.display_name ?? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim(),
+      email: c.email,
+      title: c.job_title,
+      owner: c.owner_id,
+      accountId,
+      lastActivity: c.last_contacted_via_sales_activity ?? c.updated_at,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchDealsForAccount(accountId, limit) {
+  try {
+    const data = await freshsalesFetch(
+      `/api/sales_accounts/${accountId}?include=deals`,
+    );
+    const list = data?.sales_account?.deals ?? data?.deals ?? [];
+    return list.slice(0, limit).map((d) => ({
+      id: d.id,
+      name: d.name,
+      stage: d.deal_stage_id,
+      amount: d.amount,
+      updatedAt: d.updated_at,
+      accountId,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchFreshsalesEvidence({ canonicalDomain, accountName, aliases = [], includeConversations = true, includeNotes = true, maxRecords = 100 }) {
+  const accounts = await fetchFreshsalesAccountsByDomain(canonicalDomain);
+
+  // For each matched account (up to 5), pull contacts and deals in parallel.
+  const targetAccounts = accounts.slice(0, 5);
+  const perAccountResults = await Promise.all(
+    targetAccounts.map(async (acct) => ({
+      contacts: await fetchContactsForAccount(acct.id, maxRecords),
+      deals: await fetchDealsForAccount(acct.id, 20),
+    })),
+  );
+  const contacts = perAccountResults.flatMap((r) => r.contacts);
+  const deals = perAccountResults.flatMap((r) => r.deals);
+
+  const duplicateRisk =
+    accounts.length === 0
+      ? 'none'
+      : accounts.length === 1
+        ? 'low'
+        : accounts.length <= 3
+          ? 'medium'
+          : 'high';
+
+  return {
+    status: accounts.length === 0 && contacts.length === 0 ? 'no_data' : 'ok',
+    canonicalDomain,
+    accountName,
+    aliases,
+    accounts,
+    contacts,
+    deals,
+    duplicateRisk,
+    evidenceCount: accounts.length + contacts.length + deals.length,
+    headlineReason:
+      accounts.length === 0
+        ? 'No Freshsales sales account matched this domain.'
+        : `${accounts.length} Freshsales account(s), ${contacts.length} contact(s), ${deals.length} deal(s).`,
+  };
+}
+
+function safeMessage(text) {
+  if (!text) return 'no body';
+  try {
+    const data = JSON.parse(text);
+    return String(data.message ?? data.error ?? data.errors ?? data.description ?? '').slice(0, 300);
+  } catch {
+    return text.replace(/\s+/g, ' ').slice(0, 300);
+  }
+}

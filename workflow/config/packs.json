@@ -112,8 +112,14 @@
       "tone",
       "cta",
       "length",
-      "freeformInstructions"
+      "freeformInstructions",
+      "channelOrder",
+      "stepTimingOverride",
+      "stepSkip",
+      "manualOnlyTaskOverride"
     ],
+    "collectionStyle": "walk_each_field_in_sequence",
+    "previewBeforeWrite": true,
     "guardrailsCannotOverride": [
       "approvalRequiredForExternalSends",
       "approvalRequiredForCanonicalContactCreation",

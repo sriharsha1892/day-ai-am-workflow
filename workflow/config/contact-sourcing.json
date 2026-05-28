@@ -5,8 +5,17 @@
     "keyOwner": "admin_runtime",
     "amKeysRequired": false,
     "requestPolicy": "am_can_request_provider_actions_codex_routes_to_central_connector",
-    "fallbackWhenUnavailable": "create_day_ai_connector_request_or_pause_for_admin"
+    "executor": "hosted_worker_api",
+    "executorEnvVar": "WORKER_BASE_URL",
+    "fallbackWhenUnavailable": "block_with_red_receipt"
   },
+  "leadIdentificationOrder": [
+    "imported_active_contacts",
+    "apollo_search",
+    "freshsales_mi_evidence",
+    "day_ai_existing_people",
+    "clearout_selected_verification"
+  ],
   "providers": {
     "freshsales": {
       "enabled": true,

@@ -12,6 +12,8 @@ Optional:
 
 ## Reads
 
+- `workflow/config/myra-context.json` for trial follow-up, proposal, lost, and nurture framing.
+- `workflow/config/ux-guidance.json` for receipt labels and trust panel.
 - Day AI account motion, trial context, selected contacts, prior outreach, and tasks.
 - Excel/CSV usage snapshot.
 
@@ -30,9 +32,10 @@ AM confirms the interpretation and next step before lifecycle updates or custome
 - Usage summary.
 - Adoption signals.
 - Risk/blocker assessment.
+- Decision path: proposal, product clarification, lost, nurture, or closure follow-up.
 - Recommended follow-up.
+- Trust panel: sources used, confidence, AM judgment needed, what Codex did not do, and next safest action.
 
 ## Done Criteria
 
 - Day AI reflects latest trial usage and recommended next step.
-

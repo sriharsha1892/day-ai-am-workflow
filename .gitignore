@@ -4,3 +4,8 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.vercel
+worker/.env
+worker/.secrets/
+worker/data/
+am-package/

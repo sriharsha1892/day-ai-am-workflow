@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/tour-run-state-index.schema.json",
+  "title": "myRA Tour Run State Index",
+  "description": "Per-AM index file at am-package/<am>/tour-run-state-index.json. Keyed by canonical_domain. Powers /guided-tour auto-resume and the end-of-tour roll-up.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "am", "entries"],
+  "properties": {
+    "version": { "type": "string" },
+    "am": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["email"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" }
+      }
+    },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalDomain", "runStatus"],
+      "properties": {
+        "canonicalDomain": { "type": "string" },
+        "displayName": { "type": "string" },
+        "priority": { "enum": ["P1", "P2", "P3"] },
+        "runStatus": {
+          "enum": [
+            "dry_run_complete",
+            "production_pending_approval",
+            "production_running",
+            "production_saved",
+            "pending_sync",
+            "blocked"
+          ]
+        },
+        "lastTouchedAt": { "type": "string", "format": "date-time" },
+        "lastReceiptPath": {
+          "type": "string",
+          "description": "Relative path to the most recent receipt JSON for this account."
+        },
+        "lastReceiptColor": { "enum": ["green", "yellow", "red"] },
+        "nextActionHint": {
+          "type": "string",
+          "description": "Carried verbatim from lastReceipt.summary.nextAction. Codex speaks this when offering to resume."
+        },
+        "blockerCount": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

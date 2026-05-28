@@ -39,6 +39,24 @@ Optional:
 - Separate high-confidence matches from possible matches.
 - Treat Freshsales history as context; it does not count as current AM outreach unless selected/logged into Day AI.
 
+## Execution
+
+Codex runs Freshsales evidence collection through the hosted worker. Freshsales credentials live in the worker; AMs never see them.
+
+```bash
+npm run worker:freshsales-evidence -- \
+  --domain <domain> \
+  [--account-name "<name>"] [--aliases "<comma-list>"] \
+  [--include-conversations true] [--include-notes true] \
+  [--max-records 100]
+```
+
+Worker returns a JSON evidence bundle: `accounts[]`, `contacts[]`, `deals[]`, `activities[]`, `conversations[]`, `notes[]`, each with Freshsales IDs, confidence rating (`high | medium | low | needs_review`), and a `duplicateRisk` summary for the receipt.
+
+The worker is read-only against Freshsales; the script will fail loudly if invoked with any write verb.
+
+If the worker is unreachable, set `runStatus=blocked`, show Red receipt with the failure detail, do not fall back to local Freshsales calls (AMs have no key).
+
 ## Does Not Do
 
 - Does not write to Freshsales.

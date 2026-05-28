@@ -1,6 +1,6 @@
 # Freshsales Account Flow
 
-Freshsales is the read-only evidence layer for the AM workflow. Day AI remains the system of record.
+Freshsales is the read-only evidence layer for the AM workflow. Day AI remains the system of record. Freshsales evidence also feeds duplicate-safe org resolution before any Day AI Organization is created.
 
 ## Clear Picture
 
@@ -21,6 +21,7 @@ AM account packet / Day AI account
 - Pulls linked sales accounts, owners, deals, activities, notes, and conversation/email context.
 - Helps identify warm paths, past outreach, open deals, and relationship history.
 - Supplies evidence trails for contact matching and deduplication.
+- Supplies evidence trails for Day AI Organization matching.
 
 ## What Freshsales Does Not Do
 
@@ -41,6 +42,16 @@ Do not trust Freshsales account names alone. Match with an evidence bundle:
 - Activities.
 - Conversations.
 - Notes.
+- Existing Day AI Organization IDs and match evidence.
+- Apollo organization ID/domain when available.
+
+## Day AI Duplicate-Safety Rule
+
+- Exact canonical domain or known Day AI source ID: link/update existing Organization.
+- Strong typo/name variant with multiple evidence points: link/update existing Organization and show evidence.
+- Parent/subsidiary scope: ask AM whether this is a separate operating org or parent-linked motion.
+- Ambiguous Freshsales evidence: block Day AI Organization creation and create review context/action only.
+- No credible match: allow new Organization creation after showing evidence.
 
 ## Current Active Contacts Import
 

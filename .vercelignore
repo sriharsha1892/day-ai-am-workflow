@@ -1,0 +1,37 @@
+# Don't ship AM packages, templates, shortcut markdown, or local secrets to Vercel.
+# Worker needs workflow/config/ and workflow/schemas/ at runtime — keep them.
+am-package/
+templates/
+workflow/shortcuts/
+scripts/tests/
+scripts/michelman-pilot.mjs
+scripts/setup-codex.mjs
+scripts/check-codex-setup.mjs
+scripts/create-am-*.mjs
+scripts/create-satya-*.mjs
+scripts/create-organization-editor.py
+scripts/import-organization-editor.py
+scripts/write-am-workbook.py
+scripts/validate-*.mjs
+scripts/freshsales-probe.mjs
+scripts/apollo-probe.mjs
+scripts/clearout-probe.mjs
+scripts/check-org-duplicates.mjs
+scripts/prepare-account-provisioning.mjs
+scripts/secrets-status.mjs
+scripts/set-admin-secret.mjs
+scripts/env-utils.mjs
+scripts/org-resolution-preview.mjs
+docs/
+.planning/
+.github/
+worker/data/
+worker/.secrets/
+worker/.env
+.env
+.env.local
+.env.example
+*.md
+*.csv
+*.xlsx
+.git/

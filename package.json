@@ -1,8 +1,8 @@
 {
   "name": "myra-day-ai-am-workflow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "myRA AM workflow standardization pack for Codex, Day AI, and Freshsales.",
+  "description": "myRA AM workflow standardization pack for Codex, Day AI, Freshsales, Apollo, and Clearout. Includes the hosted worker (sole production executor).",
   "type": "module",
   "scripts": {
     "setup:codex": "node scripts/setup-codex.mjs",
@@ -14,8 +14,12 @@
     "validate:active-contacts": "node scripts/validate-active-contacts.mjs templates/am-active-contacts.csv",
     "validate:assignments": "node scripts/validate-account-assignments.mjs templates/am-account-assignments.csv",
     "validate:trial-import": "node scripts/validate-trial-import.mjs templates/trial-usage-import.csv",
+    "validate:workflow-configs": "node scripts/validate-json-configs.mjs",
+    "validate:tour-run-state": "node scripts/validate-tour-run-state.mjs",
+    "check:org-duplicates": "node scripts/check-org-duplicates.mjs",
     "org-editor:create": "python3 scripts/create-organization-editor.py templates/am-account-seed-list.csv templates/am-roster.csv",
     "org-editor:import": "python3 scripts/import-organization-editor.py",
+    "org-resolution:preview": "node scripts/org-resolution-preview.mjs",
     "provision:assignments:preview": "node scripts/prepare-account-provisioning.mjs templates/am-account-assignments.csv",
     "am:packets": "node scripts/create-am-packets.mjs",
     "am:tour-packages": "node scripts/create-am-tour-packages.mjs",
@@ -25,6 +29,24 @@
     "freshsales:probe": "node scripts/freshsales-probe.mjs",
     "apollo:probe": "node scripts/apollo-probe.mjs",
     "clearout:probe": "node scripts/clearout-probe.mjs",
-    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import"
+    "worker:start": "node worker/index.mjs",
+    "worker:resolve-identity": "node scripts/worker-resolve-identity.mjs",
+    "worker:freshsales-evidence": "node scripts/worker-freshsales-evidence.mjs",
+    "worker:apollo-search": "node scripts/worker-apollo-search.mjs",
+    "worker:apollo-enrich": "node scripts/worker-apollo-enrich.mjs",
+    "worker:clearout-verify": "node scripts/worker-clearout-verify.mjs",
+    "worker:dayai-write": "node scripts/worker-dayai-write.mjs",
+    "worker:receipt": "node scripts/worker-receipt.mjs",
+    "worker:run-state": "node scripts/worker-run-state.mjs",
+    "worker:end-tour": "node scripts/worker-end-tour.mjs",
+    "worker:dayai-probe": "node scripts/worker-dayai-probe.mjs",
+    "worker:dayai-onboard": "node scripts/worker-dayai-onboard.mjs",
+    "michelman:pilot": "node scripts/michelman-pilot.mjs",
+    "test:all": "node scripts/tests/run-all.mjs",
+    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:workflow-configs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import && npm run check:org-duplicates && npm run validate:tour-run-state"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "hono": "^4.6.0"
   }
 }

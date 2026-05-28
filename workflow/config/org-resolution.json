@@ -1,0 +1,94 @@
+{
+  "$schema": "../schemas/org-resolution.schema.json",
+  "version": "1.0",
+  "purpose": "Prevent duplicate Day AI Organizations before account intake writes.",
+  "normalization": {
+    "canonicalDomainRules": [
+      "lowercase",
+      "trim",
+      "strip protocol",
+      "strip leading www",
+      "strip trailing slash/path/query",
+      "punycode/unicode normalization when available"
+    ],
+    "nameRules": [
+      "lowercase",
+      "remove punctuation",
+      "collapse whitespace",
+      "strip common suffixes such as inc, ltd, llc, plc, corp, corporation, group, company only for comparison"
+    ],
+    "aliasSources": [
+      "provided aliases",
+      "parent company",
+      "subsidiaries",
+      "Freshsales sales account names",
+      "Freshsales notes/deals/conversation evidence",
+      "Apollo organization name and domain",
+      "website redirects"
+    ]
+  },
+  "evidenceInputs": [
+    "Day AI Organization domain/name/aliases/source IDs",
+    "Day AI Opportunity/account motion context",
+    "Day AI People email domains and linked account context",
+    "Freshsales sales account IDs and domains",
+    "Freshsales contact/lead email domains",
+    "Freshsales deals, activities, conversations, and notes",
+    "Apollo organization ID/name/domain",
+    "public website redirects and official source URLs"
+  ],
+  "decisionPolicy": {
+    "exactCanonicalDomain": {
+      "action": "auto_link_existing",
+      "minimumConfidence": 0.98,
+      "receipt": "Matched existing Day AI Organization by canonical domain."
+    },
+    "knownSourceId": {
+      "action": "auto_link_existing",
+      "minimumConfidence": 0.98,
+      "receipt": "Matched existing Day AI Organization by stored source ID."
+    },
+    "clearTypoOrNameVariant": {
+      "action": "auto_link_existing_with_receipt",
+      "minimumConfidence": 0.9,
+      "requiredEvidenceCount": 2,
+      "receipt": "Matched existing Day AI Organization by strong variant evidence."
+    },
+    "parentSubsidiary": {
+      "action": "ask_am_decision",
+      "minimumConfidence": 0.75,
+      "options": ["separate_operating_org", "link_to_parent"],
+      "receipt": "Parent/subsidiary scope needs AM decision before Organization write."
+    },
+    "ambiguous": {
+      "action": "block_org_creation_create_review_context",
+      "maximumConfidence": 0.89,
+      "receipt": "Blocked Organization creation because multiple plausible matches exist."
+    },
+    "noCredibleMatch": {
+      "action": "allow_new_org_after_receipt",
+      "maximumConfidence": 0.49,
+      "receipt": "No credible existing Organization match found."
+    }
+  },
+  "dayAiFields": [
+    "match_status",
+    "match_confidence",
+    "matched_day_ai_org_id",
+    "candidate_orgs",
+    "match_evidence",
+    "parent_org_candidate",
+    "admin_review_required",
+    "idempotency_key"
+  ],
+  "idempotency": {
+    "organizationKey": "canonical_domain when present, otherwise normalized account name plus owner email plus created date",
+    "writeBehavior": "retry updates the same pending or matched Day AI record; never create a second Organization for the same idempotency key"
+  },
+  "receiptRequirements": [
+    "Show whether Codex is matching an existing Organization, asking for parent/subsidiary decision, blocking for review, or creating a new Organization.",
+    "Show the top candidate matches with evidence and confidence.",
+    "Show which Day AI fields will be written.",
+    "If blocked, show the review task/context that will be created instead of an Organization."
+  ]
+}

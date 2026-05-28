@@ -17,6 +17,10 @@ const requiredFiles = [
   'AGENTS.md',
   'AM_TOUR.md',
   'workflow/shortcuts/guided-tour.md',
+  'workflow/shortcuts/org-resolution.md',
+  'workflow/config/myra-context.json',
+  'workflow/config/org-resolution.json',
+  'workflow/config/ux-guidance.json',
 ];
 
 const errors = [];
@@ -30,8 +34,20 @@ if (fs.existsSync(packetPath)) {
   packet = JSON.parse(fs.readFileSync(packetPath, 'utf8'));
   if (!packet.am?.email) errors.push('Missing am.email in account-packet.json');
   if (!Array.isArray(packet.accounts)) errors.push('Missing accounts[] in account-packet.json');
+  if (!packet.workflowContext?.myraContextPack) errors.push('Missing workflowContext.myraContextPack in account-packet.json');
+  if (!packet.ux?.guidance) errors.push('Missing ux.guidance in account-packet.json');
+  if (!packet.ux?.trustPanelRequired) errors.push('Missing ux.trustPanelRequired in account-packet.json');
+  if (!packet.orgResolution?.requiredBeforeAccountIntake) errors.push('Missing orgResolution.requiredBeforeAccountIntake in account-packet.json');
+  if (!packet.reliability?.dayAiWriteMode) errors.push('Missing reliability.dayAiWriteMode in account-packet.json');
+  if (!packet.reliability?.workerExecution) {
+    errors.push('Missing reliability.workerExecution in account-packet.json (must declare hosted worker as production executor)');
+  }
+  if (!packet.adminReadiness?.checks?.length) errors.push('Missing adminReadiness.checks in account-packet.json');
   if (packet.accounts?.some((account) => account.status === 'ready_for_intake' && !account.domain)) {
     errors.push('Ready account without domain');
+  }
+  if (packet.accounts?.some((account) => account.status === 'ready_for_intake' && !account.orgResolutionCommand)) {
+    errors.push('Ready account without orgResolutionCommand');
   }
 }
 

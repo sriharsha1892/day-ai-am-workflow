@@ -1,0 +1,169 @@
+{
+  "$schema": "../schemas/ux-guidance.schema.json",
+  "version": "1.1",
+  "defaultTourMode": "standard",
+  "tourModes": {
+    "beginner": {
+      "label": "Beginner",
+      "useWhen": "AM wants plain-language guidance and one decision at a time.",
+      "behavior": [
+        "Explain each checkpoint in one or two lines.",
+        "Ask one decision at a time.",
+        "Avoid slash commands unless showing a copy-paste fallback.",
+        "Use Green/Yellow/Red receipt labels with the narrative paragraph.",
+        "End each checkpoint with the exact next prompt."
+      ]
+    },
+    "standard": {
+      "label": "Standard",
+      "useWhen": "Default mode for most AMs.",
+      "behavior": [
+        "Speak the receipt narrative paragraph, then show the four color-coded provider bullets.",
+        "Show decision plus headline reason; expand to full evidence only on Yellow/Red or when AM asks.",
+        "Use natural prompts first and slash commands only as traceability.",
+        "Show trust panels after major checkpoints."
+      ]
+    },
+    "power": {
+      "label": "Power",
+      "useWhen": "AI-native AM wants speed and direct control.",
+      "behavior": [
+        "Suppress the narrative paragraph; show only the four color-coded provider bullets plus headline.",
+        "Accept slash commands and compact natural prompts.",
+        "Keep receipts concise but never skip approval gates.",
+        "Show source/evidence only when it affects the decision or the AM asks."
+      ]
+    }
+  },
+  "firstRunStations": [
+    {
+      "id": "account_safety",
+      "label": "Account Safety Check",
+      "goal": "Confirm the right company and prevent duplicate Day AI Organizations.",
+      "primaryShortcut": "/org-resolution"
+    },
+    {
+      "id": "research",
+      "label": "Research",
+      "goal": "Build myRA-specific account understanding and buyer hypotheses.",
+      "primaryShortcut": "/research-account"
+    },
+    {
+      "id": "contacts",
+      "label": "Contacts",
+      "goal": "Compare imported, Apollo, Freshsales, and Day AI candidates before approval.",
+      "primaryShortcut": "/map-contacts"
+    },
+    {
+      "id": "cadence_draft",
+      "label": "Cadence And Draft",
+      "goal": "Create a branching action plan and one reviewable draft.",
+      "primaryShortcut": "/build-cadence"
+    },
+    {
+      "id": "day_ai_health",
+      "label": "Day AI Health Snapshot",
+      "goal": "Confirm what was saved and identify the next best action.",
+      "primaryShortcut": "/account-health"
+    }
+  ],
+  "naturalPromptRoutes": [
+    { "examples": ["start my myra am tour", "start my am guided tour", "resume my myra am tour"], "route": "/guided-tour" },
+    { "examples": ["continue", "resume", "where was i", "pick up where i left off"], "route": "/guided-tour resume" },
+    { "examples": ["find leads", "find contacts", "identify leads for this account", "who should i target", "show me target contacts"], "route": "/map-contacts" },
+    { "examples": ["find icp", "who is the icp", "which personas matter", "find buyer personas"], "route": "/research-account -> /map-contacts" },
+    { "examples": ["research this account", "account research", "tell me about this company"], "route": "/research-account" },
+    { "examples": ["run smart org match", "check duplicate account", "is this already in day ai", "check account safety"], "route": "/org-resolution" },
+    { "examples": ["build my cadence", "make a plan", "next outreach plan", "sequence this account"], "route": "/build-cadence" },
+    { "examples": ["draft outreach", "write first email", "write a note", "draft first touch"], "route": "/draft-outreach" },
+    { "examples": ["what is next", "what should i do next", "account health", "what happened in day ai"], "route": "/account-health" },
+    { "examples": ["did this save to day ai", "show saved records", "show what was saved to day ai"], "route": "/account-health" },
+    { "examples": ["fix day ai", "day ai broke", "mcp crashed", "connection failed", "retry sync", "worker unreachable"], "route": "/guided-tour recovery" },
+    { "examples": ["show details", "show your work", "why", "show the evidence", "expand"], "route": "/expand-receipt" },
+    { "examples": ["wrap up", "end tour", "bye", "done for today", "close", "goodbye"], "route": "/end-tour" }
+  ],
+  "receiptLevels": {
+    "green": {
+      "label": "Green",
+      "meaning": "Safe to proceed or already saved.",
+      "examples": ["Exact domain matched existing Organization.", "Day AI write returned a record ID."]
+    },
+    "yellow": {
+      "label": "Yellow",
+      "meaning": "AM decision needed before write or next action.",
+      "examples": ["Parent/subsidiary scope is unclear.", "Contacts need AM selection before canonicalization."]
+    },
+    "red": {
+      "label": "Red",
+      "meaning": "Stop and review; do not create or send.",
+      "examples": ["Ambiguous Organization match.", "Day AI write failed and is pending sync.", "Hosted worker unreachable."]
+    }
+  },
+  "trustPanel": {
+    "requiredAfter": ["org-resolution", "research-account", "map-contacts", "build-cadence", "draft-outreach", "account-health"],
+    "sections": [
+      "Sources used",
+      "What I am confident about",
+      "What needs AM judgment",
+      "What I did not do",
+      "Next safest action"
+    ]
+  },
+  "contactCardTiers": {
+    "recommended": "Strong role fit and evidence; ask AM to approve/enrich/verify.",
+    "maybe": "Useful but incomplete evidence; ask AM whether to keep, enrich, or skip.",
+    "hold": "Weak fit, duplicate risk, bad email, or ambiguous company evidence."
+  },
+  "pendingSync": {
+    "statusLabel": "pending_sync",
+    "requiredFields": ["attemptedWrite", "idempotencyKey", "reason", "retryPrompt", "duplicateSafetyNote"],
+    "retryPrompt": "Retry pending Day AI sync for this account using the same idempotency key."
+  },
+  "adminReadiness": {
+    "checks": [
+      "Package generated",
+      "Day AI connected",
+      "First account started",
+      "Org match passed",
+      "Day AI write confirmed",
+      "Blockers captured"
+    ]
+  },
+  "unifiedReceipt": {
+    "schemaRef": "../schemas/account-receipt.schema.json",
+    "defaultExpandedEvidence": false,
+    "autoExpandOnYellowOrRed": true,
+    "persistence": {
+      "localPathTemplate": "am-package/<am>/<account>/receipts/<timestamp>.json",
+      "dayAiContextPage": true
+    }
+  },
+  "renderingMode": {
+    "narrative": true,
+    "providerBullets": true,
+    "suppressNarrativeInPowerMode": true
+  },
+  "coachingDepth": "decision_plus_headline_reason",
+  "contactSelection": {
+    "defaultFlow": "bulk_with_veto_then_walk_maybe",
+    "powerEscape": "numbered_list_anywhere",
+    "autoApproveTier": "recommended",
+    "walkTier": "maybe",
+    "skipTier": "hold"
+  },
+  "endOfTour": {
+    "triggers": [
+      "bye",
+      "wrap up",
+      "end tour",
+      "done for today",
+      "close",
+      "goodbye",
+      "/end-tour",
+      "inactivity_15min_at_station_boundary"
+    ],
+    "format": "brief_summary_plus_pending_plus_next_session_prompt",
+    "writeDigest": true,
+    "digestPathTemplate": "am-package/<am>/digests/<date>.md"
+  }
+}

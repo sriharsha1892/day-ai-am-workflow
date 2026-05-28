@@ -18,6 +18,8 @@ Optional:
 
 ## Reads
 
+- `workflow/config/myra-context.json` for channel outcome and next-step framing.
+- `workflow/config/ux-guidance.json` for receipt labels.
 - Day AI selected contact and account motion.
 - Freshsales/Freshcaller activity only when reconciling a call outcome.
 
@@ -40,4 +42,3 @@ AM confirms the touch summary and next step before it is recorded.
 
 - Day AI ledger reflects the touch for reporting.
 - Freshsales history is not counted unless AM selected/logged the touch.
-

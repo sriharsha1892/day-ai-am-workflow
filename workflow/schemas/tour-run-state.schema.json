@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/tour-run-state.schema.json",
+  "title": "myRA Tour Run State",
+  "description": "Per-account runtime state for a guided tour. Lives at am-package/<am>/<account>/tour-run-state.json. Survives Codex restarts so auto-resume can pick up where the AM left off.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "account", "am", "runStatus", "stations"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version. Mirrors the account-packet version so packet+state stay aligned."
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalDomain", "displayName"],
+      "properties": {
+        "canonicalDomain": {
+          "type": "string",
+          "description": "Domain-first identity key. Lowercased, no protocol, no www, no path."
+        },
+        "displayName": { "type": "string" },
+        "priority": { "enum": ["P1", "P2", "P3"] }
+      }
+    },
+    "am": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["email"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "approvingForRun": {
+          "type": "boolean",
+          "description": "True while this AM is the active approver for in-flight worker writes."
+        }
+      }
+    },
+    "runStatus": {
+      "enum": [
+        "dry_run_complete",
+        "production_pending_approval",
+        "production_running",
+        "production_saved",
+        "pending_sync",
+        "blocked"
+      ]
+    },
+    "stations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/station" }
+    },
+    "pendingSync": {
+      "type": "array",
+      "description": "Failed Day AI writes awaiting retry. Codex shows these as Red receipts.",
+      "items": { "$ref": "#/$defs/pendingSyncEntry" }
+    },
+    "lastReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "localPath": { "type": "string" },
+        "dayAiContextPageId": { "type": "string" },
+        "color": { "enum": ["green", "yellow", "red"] },
+        "writtenAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "lastTouchedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "station": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Matches firstRunStations[].id in ux-guidance.json."
+        },
+        "status": {
+          "enum": ["not_started", "in_progress", "complete", "skipped", "blocked"]
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "idempotencyKey": { "type": "string" },
+        "dayAiRecordIds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": { "enum": ["organization", "opportunity", "person", "action", "draft", "page"] },
+              "id": { "type": "string" },
+              "link": { "type": "string" }
+            }
+          }
+        },
+        "blockerReason": { "type": "string" }
+      }
+    },
+    "pendingSyncEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptedWrite", "idempotencyKey", "reason", "retryPrompt"],
+      "properties": {
+        "attemptedWrite": {
+          "type": "string",
+          "description": "Verb + object type, e.g. org-create, person-create."
+        },
+        "idempotencyKey": { "type": "string" },
+        "reason": { "type": "string" },
+        "retryPrompt": { "type": "string" },
+        "duplicateSafetyNote": { "type": "string" },
+        "firstAttemptAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

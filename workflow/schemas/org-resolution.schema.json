@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/org-resolution.schema.json",
+  "title": "myRA Org Resolution Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "purpose", "normalization", "evidenceInputs", "decisionPolicy", "dayAiFields", "idempotency", "receiptRequirements"],
+  "properties": {
+    "version": { "type": "string" },
+    "purpose": { "type": "string" },
+    "normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalDomainRules", "nameRules", "aliasSources"],
+      "properties": {
+        "canonicalDomainRules": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "nameRules": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "aliasSources": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "evidenceInputs": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "decisionPolicy": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["action", "receipt"],
+        "properties": {
+          "action": { "type": "string" },
+          "minimumConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "maximumConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "requiredEvidenceCount": { "type": "integer", "minimum": 1 },
+          "options": { "type": "array", "items": { "type": "string" } },
+          "receipt": { "type": "string" }
+        }
+      },
+      "required": ["exactCanonicalDomain", "knownSourceId", "clearTypoOrNameVariant", "parentSubsidiary", "ambiguous", "noCredibleMatch"]
+    },
+    "dayAiFields": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "idempotency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organizationKey", "writeBehavior"],
+      "properties": {
+        "organizationKey": { "type": "string" },
+        "writeBehavior": { "type": "string" }
+      }
+    },
+    "receiptRequirements": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  }
+}

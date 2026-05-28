@@ -13,11 +13,43 @@
       "properties": {
         "name": { "type": "string", "minLength": 1 },
         "domain": { "type": "string", "pattern": "^[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$" },
+        "canonicalDomain": { "type": "string" },
+        "domainAliases": { "type": "array", "items": { "type": "string" } },
         "aliases": { "type": "array", "items": { "type": "string" } },
         "parentCompany": { "type": "string" },
+        "parentCompanyDomain": { "type": "string" },
+        "subsidiaries": { "type": "array", "items": { "type": "string" } },
         "dayAiOrganizationId": { "type": "string" },
         "dayAiOpportunityId": { "type": "string" },
+        "apolloOrganizationId": { "type": "string" },
         "freshsalesEvidence": { "$ref": "#/$defs/evidenceList" }
+      }
+    },
+    "orgResolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matchStatus"],
+      "properties": {
+        "matchStatus": {
+          "enum": [
+            "auto_link_existing",
+            "auto_link_existing_with_receipt",
+            "ask_parent_subsidiary_scope",
+            "block_for_review",
+            "allow_new_org",
+            "pending"
+          ]
+        },
+        "matchConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "matchedDayAiOrgId": { "type": "string" },
+        "candidateOrgs": { "type": "array", "items": { "$ref": "#/$defs/orgCandidate" } },
+        "matchEvidence": { "$ref": "#/$defs/evidenceList" },
+        "parentOrgCandidate": { "$ref": "#/$defs/orgCandidate" },
+        "adminReviewRequired": { "type": "boolean" },
+        "idempotencyKey": { "type": "string" },
+        "approvedBy": { "type": "string", "format": "email" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "decisionNotes": { "type": "string" }
       }
     },
     "lifecycle": {
@@ -67,6 +99,36 @@
         "cta": { "type": "string" },
         "length": { "type": "string" },
         "freeformInstructions": { "type": "string" },
+        "channelOrder": { "type": "array", "items": { "type": "string" } },
+        "stepTimingOverrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stepIndex", "day"],
+            "properties": {
+              "stepIndex": { "type": "integer", "minimum": 0 },
+              "day": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "skippedSteps": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "manualOnlyTaskOverrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["stepIndex", "channel"],
+            "properties": {
+              "stepIndex": { "type": "integer", "minimum": 0 },
+              "channel": { "enum": ["call", "linkedin", "whatsapp", "demo", "internal"] },
+              "reason": { "type": "string" }
+            }
+          }
+        },
         "source": {
           "enum": ["globalDefault", "dayAiAmProfileContext", "dayAiAccountContext", "amDialog", "provisioning"]
         },
@@ -88,13 +150,45 @@
       "properties": {
         "trialStatus": { "type": "string" },
         "trialStartDate": { "type": "string" },
+        "trialEndDate": { "type": "string" },
+        "primaryUserEmail": { "type": "string", "format": "email" },
         "usersInvited": { "type": "integer", "minimum": 0 },
         "activeUsers7d": { "type": "integer", "minimum": 0 },
         "researchRuns": { "type": "integer", "minimum": 0 },
+        "trialQueries": { "type": "integer", "minimum": 0 },
         "exports": { "type": "integer", "minimum": 0 },
         "shares": { "type": "integer", "minimum": 0 },
+        "featuresUsed": { "type": "array", "items": { "type": "string" } },
+        "qualitativeFeedback": { "type": "string" },
+        "blockers": { "type": "array", "items": { "type": "string" } },
         "lastActivityAt": { "type": "string" },
         "notes": { "type": "string" }
+      }
+    },
+    "sequences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sequenceStep" }
+    },
+    "runState": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Mirror of tour-run-state.json runtime status, embedded in the packet so packet+state stay aligned across reads.",
+      "properties": {
+        "runStatus": {
+          "enum": [
+            "dry_run_complete",
+            "production_pending_approval",
+            "production_running",
+            "production_saved",
+            "pending_sync",
+            "blocked"
+          ]
+        },
+        "stationsComplete": { "type": "array", "items": { "type": "string" } },
+        "lastReceiptPath": { "type": "string" },
+        "lastReceiptColor": { "enum": ["green", "yellow", "red"] },
+        "pendingSyncCount": { "type": "integer", "minimum": 0 },
+        "lastTouchedAt": { "type": "string", "format": "date-time" }
       }
     }
   },
@@ -110,6 +204,20 @@
           "value": { "type": "string" },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
         }
+      }
+    },
+    "orgCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "confidence"],
+      "properties": {
+        "name": { "type": "string" },
+        "domain": { "type": "string" },
+        "dayAiOrganizationId": { "type": "string" },
+        "freshsalesAccountIds": { "type": "array", "items": { "type": "string" } },
+        "apolloOrganizationId": { "type": "string" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "$ref": "#/$defs/evidenceList" }
       }
     },
     "signal": {
@@ -136,7 +244,11 @@
         "dayAiPersonId": { "type": "string" },
         "freshsalesIds": { "type": "array", "items": { "type": "string" } },
         "dedupeConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
-        "evidence": { "$ref": "#/$defs/evidenceList" }
+        "evidence": { "$ref": "#/$defs/evidenceList" },
+        "tier": { "enum": ["Recommended", "Maybe", "Hold"] },
+        "approvedBy": { "type": "string", "format": "email" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "idempotencyKey": { "type": "string" }
       }
     },
     "ledgerEntry": {
@@ -150,7 +262,28 @@
         "summary": { "type": "string" },
         "outcome": { "type": "string" },
         "nextStep": { "type": "string" },
-        "dayAiActionId": { "type": "string" }
+        "dayAiActionId": { "type": "string" },
+        "approvedBy": { "type": "string", "format": "email" },
+        "idempotencyKey": { "type": "string" }
+      }
+    },
+    "sequenceStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "status", "summary"],
+      "properties": {
+        "contactEmail": { "type": "string", "format": "email" },
+        "channel": { "enum": ["email", "call", "linkedin", "whatsapp", "demo", "trial", "internal"] },
+        "status": { "enum": ["planned", "done", "skipped", "blocked", "pending_approval"] },
+        "summary": { "type": "string" },
+        "dueAt": { "type": "string" },
+        "dependsOn": { "type": "string" },
+        "branchIf": { "type": "string" },
+        "dayAiActionId": { "type": "string" },
+        "dayAiDraftId": { "type": "string" },
+        "approvedBy": { "type": "string", "format": "email" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "idempotencyKey": { "type": "string" }
       }
     }
   }

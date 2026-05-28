@@ -24,6 +24,33 @@ Canonicalize AM-approved contacts in Day AI.
 - Never merge or mutate Freshsales records.
 - Never create Apollo contacts or sequences in v1.
 
+## Execution
+
+Codex runs the dedupe + canonicalization through the hosted worker.
+
+```bash
+# 1. Run a duplicate check across Day AI People and Freshsales for AM-selected candidates
+npm run worker:dayai-write -- \
+  --action person-dedupe-check \
+  --canonical-domain <domain> \
+  --candidates <path-to-selected-candidates.json> \
+  --approving-am <owner_email>
+
+# 2. After AM approves the dedupe decision per candidate, canonicalize
+npm run worker:dayai-write -- \
+  --action person-create \
+  --canonical-domain <domain> \
+  --candidate <single-candidate-payload> \
+  --idempotency-key <key from dedupe-check> \
+  --approving-am <owner_email>
+```
+
+The `person-dedupe-check` step returns per-candidate `dedupeConfidence`, `matchedDayAiPersonId?`, `freshsalesIds`, `evidenceTrail`, and a decision recommendation (`create_new | link_existing | skip_duplicate`). The AM approves each one.
+
+Every `person-create` write stamps the approving AM and an idempotency key derived from `canonical_domain + email + ISO date`. Retries reuse the same key — the worker rejects duplicate Person creation server-side.
+
+If the worker is unreachable, set `runStatus=blocked`, show Red receipt, do not write locally.
+
 ## AM Decision Point
 
 AM approval is required before creating or updating canonical Day AI people.

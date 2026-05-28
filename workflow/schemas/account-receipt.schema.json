@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/account-receipt.schema.json",
+  "title": "myRA Unified Account Receipt",
+  "description": "Canonical receipt shape returned by worker:receipt. The single source of truth for what happened on an account. Codex renders narrative + per-provider color bullets by default; full evidence only on Yellow/Red or AM request.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "account", "summary", "providers", "approvedBy"],
+  "properties": {
+    "version": { "type": "string" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalDomain", "displayName"],
+      "properties": {
+        "canonicalDomain": { "type": "string" },
+        "displayName": { "type": "string" },
+        "dayAiOrganizationId": { "type": "string" },
+        "dayAiOpportunityId": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "headline", "narrative", "nextAction"],
+      "properties": {
+        "color": { "enum": ["green", "yellow", "red"] },
+        "headline": { "type": "string" },
+        "narrative": {
+          "type": "string",
+          "description": "3-4 sentence plain-English summary. Codex speaks this verbatim or paraphrases lightly."
+        },
+        "nextAction": {
+          "type": "string",
+          "description": "The safest next AM action. Carried into tour-run-state-index for auto-resume."
+        },
+        "headlineReasonByProvider": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "freshsales": { "type": "string" },
+            "apollo": { "type": "string" },
+            "clearout": { "type": "string" },
+            "dayAi": { "type": "string" }
+          }
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshsales", "apollo", "clearout", "dayAi"],
+      "properties": {
+        "freshsales": { "$ref": "#/$defs/freshsalesBlock" },
+        "apollo": { "$ref": "#/$defs/apolloBlock" },
+        "clearout": { "$ref": "#/$defs/clearoutBlock" },
+        "dayAi": { "$ref": "#/$defs/dayAiBlock" }
+      }
+    },
+    "contacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/contactReceipt" }
+    },
+    "approvedBy": {
+      "type": "string",
+      "format": "email",
+      "description": "The AM whose worker token authenticated the run. Stamped on every Day AI write."
+    },
+    "approvals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/approvalRecord" }
+    },
+    "idempotencyKeys": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "localPath": { "type": "string" },
+        "dayAiContextPageId": { "type": "string" },
+        "dayAiContextPageLink": { "type": "string" }
+      }
+    },
+    "expanded": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Full evidence, alternatives considered, scoring breakdowns. Always populated server-side. Codex shows only on Yellow/Red receipts or when AM asks 'show details' / power mode."
+    }
+  },
+  "$defs": {
+    "providerStatus": {
+      "enum": ["ok", "skipped", "no_data", "failed", "blocked"]
+    },
+    "freshsalesBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/providerStatus" },
+        "evidenceCount": { "type": "integer", "minimum": 0 },
+        "duplicateRisk": {
+          "enum": ["none", "low", "medium", "high"]
+        },
+        "blockers": { "type": "array", "items": { "type": "string" } },
+        "headlineReason": { "type": "string" }
+      }
+    },
+    "apolloBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/providerStatus" },
+        "candidateCount": { "type": "integer", "minimum": 0 },
+        "tieredCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "recommended": { "type": "integer", "minimum": 0 },
+            "maybe": { "type": "integer", "minimum": 0 },
+            "hold": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "enrichmentStatus": {
+          "enum": ["not_requested", "requested", "complete", "partial", "failed"]
+        },
+        "creditsConsumed": { "type": "integer", "minimum": 0 },
+        "headlineReason": { "type": "string" }
+      }
+    },
+    "clearoutBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/providerStatus" },
+        "verified": { "type": "integer", "minimum": 0 },
+        "risky": { "type": "integer", "minimum": 0 },
+        "invalid": { "type": "integer", "minimum": 0 },
+        "creditsConsumed": { "type": "integer", "minimum": 0 },
+        "headlineReason": { "type": "string" }
+      }
+    },
+    "dayAiBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "$ref": "#/$defs/providerStatus" },
+        "savedObjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id"],
+            "properties": {
+              "type": { "enum": ["organization", "opportunity", "person", "action", "draft", "page"] },
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "link": { "type": "string" },
+              "idempotencyKey": { "type": "string" }
+            }
+          }
+        },
+        "pendingSync": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["attemptedWrite", "idempotencyKey", "reason"],
+            "properties": {
+              "attemptedWrite": { "type": "string" },
+              "idempotencyKey": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "links": { "type": "array", "items": { "type": "string" } },
+        "headlineReason": { "type": "string" }
+      }
+    },
+    "contactReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["email", "tier", "decision"],
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "title": { "type": "string" },
+        "tier": { "enum": ["Recommended", "Maybe", "Hold"] },
+        "decision": {
+          "enum": ["approved", "skipped", "held", "vetoed", "pending"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dayAiPersonId": { "type": "string" },
+        "clearoutResult": {
+          "enum": ["verified", "risky", "invalid", "not_run"]
+        }
+      }
+    },
+    "approvalRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "approvedBy", "approvedAt"],
+      "properties": {
+        "action": { "type": "string" },
+        "approvedBy": { "type": "string", "format": "email" },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "idempotencyKey": { "type": "string" },
+        "objectType": { "enum": ["organization", "opportunity", "person", "action", "draft", "page"] },
+        "objectId": { "type": "string" }
+      }
+    }
+  }
+}

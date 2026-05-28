@@ -15,10 +15,17 @@ Optional:
 
 ## Reads
 
+- `workflow/config/myra-context.json`.
 - Public account information.
 - myRA product context from product.ask-myra.ai positioning.
 - Day AI account context, existing notes, actions, pages, and opportunity state.
 - Freshsales account/contact/deal/activity/conversation/notes context when available.
+
+## myRA Context Requirements
+
+- Frame research around decision-grade intelligence, expert-validated research, market/competitive/customer/supplier/trend intelligence, internal data integrations, and accountable outputs.
+- Include account-specific myRA use cases rather than generic AI productivity claims.
+- Tie each signal to a likely buyer problem and a next AM action.
 
 ## AM Decision Point
 
@@ -40,9 +47,9 @@ Ask the AM to confirm or edit the account-specific use cases and target persona 
 - Concise account brief.
 - Signal/use-case table.
 - Recommended persona priorities.
+- myRA-specific account-fit hypothesis.
 - Open questions the AM should answer before outreach.
 
 ## Done Criteria
 
 - AM has enough account understanding to map contacts and draft outreach without starting from scratch.
-

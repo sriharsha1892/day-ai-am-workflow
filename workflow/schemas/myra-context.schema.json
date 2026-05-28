@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://myra.ai/schemas/myra-context.schema.json",
+  "title": "myRA Context Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "positioning", "accountFitFrame", "personaFrames", "stageFrames", "requiredOutputChecks"],
+  "properties": {
+    "version": { "type": "string" },
+    "positioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oneLine", "pillars", "notGeneric"],
+      "properties": {
+        "oneLine": { "type": "string" },
+        "pillars": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "notGeneric": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "accountFitFrame": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "personaFrames": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "minProperties": 1
+    },
+    "stageFrames": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "minProperties": 1
+    },
+    "requiredOutputChecks": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+  }
+}

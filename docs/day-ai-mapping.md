@@ -15,6 +15,9 @@ Day AI is the primary system of record for the AM workflow.
 | Touch ledger | Context/action metadata | Count only AM-selected contacts and Day AI ledger activity. |
 | Trial usage | Context/custom properties | Excel import in v1, product API later. |
 | Pack choices | Account context and AM profile context | Store persona, cadence, and channel pack choices in Day AI; repo config only provides defaults. |
+| Organization match evidence | Organization context or review page/action | Prevent duplicate Organizations before intake writes. |
+| Sequence state | Actions plus account/contact context | Track branching email, LinkedIn, call, WhatsApp, demo, trial, and internal steps. |
+| Pending sync | Context/action metadata | Capture failed Day AI writes with idempotency key and retry prompt. |
 
 ## Lifecycle
 
@@ -48,6 +51,43 @@ AM approval is required before:
 - Canonical contact creation.
 - Lifecycle changes after initial intake.
 - Calendar event creation in future versions.
+
+## Smart Organization Matching
+
+`/account-intake` must run org resolution before creating a Day AI Organization.
+
+Use these Day AI fields or equivalent context/page metadata:
+
+- `match_status`
+- `match_confidence`
+- `matched_day_ai_org_id`
+- `candidate_orgs`
+- `match_evidence`
+- `parent_org_candidate`
+- `admin_review_required`
+- `idempotency_key`
+
+Decision rules:
+
+- Exact canonical domain or known Day AI source ID links to the existing Organization.
+- Clear spelling/name variants with strong evidence link to the existing Organization and show a receipt.
+- Parent/subsidiary ambiguity asks the AM whether to create a separate operating org or link to parent.
+- Ambiguous identity blocks Organization creation and creates only review context/action.
+- New Organization creation is allowed only after showing that no credible match was found.
+
+Retries must use the same `idempotency_key` and must not create a second Organization.
+
+## Pending Sync UX
+
+If a Day AI write fails or MCP crashes, Codex should show `Red: pending_sync` and store/display:
+
+- attempted write,
+- idempotency key,
+- reason,
+- retry prompt,
+- duplicate-safety note.
+
+The retry must use the same idempotency key.
 
 ## Pack Context
 

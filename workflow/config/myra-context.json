@@ -1,0 +1,55 @@
+{
+  "$schema": "../schemas/myra-context.schema.json",
+  "version": "1.0",
+  "positioning": {
+    "oneLine": "myRA helps teams get decision-grade intelligence through expert-validated research, accountable outputs, and context-aware workflows.",
+    "pillars": [
+      "Decision-grade intelligence",
+      "Expert-validated research",
+      "Market, competitive, customer, supplier, and trend intelligence",
+      "Internal data integrations",
+      "Accountable research outputs with source trails"
+    ],
+    "notGeneric": [
+      "Do not describe myRA as a generic chatbot.",
+      "Do not create outreach that only says AI productivity.",
+      "Do not use account research without tying it to a concrete intelligence workflow."
+    ]
+  },
+  "accountFitFrame": [
+    "What decision or research workflow is likely painful for this account?",
+    "Which market, competitive, customer, supplier, or trend intelligence need is visible from public signals?",
+    "Where would expert validation make the output more trusted?",
+    "What internal data, documents, or recurring research requests could myRA help organize?",
+    "What accountable output should the AM offer: account brief, market scan, supplier view, competitive map, customer intelligence, or trend watch?"
+  ],
+  "personaFrames": {
+    "Strategy": "Frame myRA around faster strategic decisions, market entry, investment themes, and executive-ready research outputs.",
+    "Market Intelligence": "Frame myRA around continuous market, competitor, customer, and trend intelligence with source trails.",
+    "Insights/Research": "Frame myRA around repeatable research workflows, expert validation, and high-confidence synthesis.",
+    "Innovation": "Frame myRA around technology scouting, trend monitoring, adjacency mapping, and innovation pipeline support.",
+    "Corporate Development": "Frame myRA around target screening, diligence support, market landscapes, and competitive positioning.",
+    "Procurement": "Frame myRA around supplier intelligence, risk signals, cost drivers, and category research.",
+    "Business Unit Leader": "Frame myRA around practical decisions for growth, customers, competitors, suppliers, and operating priorities."
+  },
+  "stageFrames": {
+    "Researching": "Identify the account-specific intelligence problem and buyer hypothesis before contact selection.",
+    "Contacts Mapped": "Explain why each selected role matters for myRA adoption and what use case they likely care about.",
+    "Outreach Active": "Tie every touch to an account signal, persona pain, and a clear myRA use case.",
+    "Demo Scheduled": "Prepare a demo agenda around the account's most likely intelligence workflows.",
+    "Demo Done": "Capture what resonated, what was unclear, and which myRA workflow should be proven in trial.",
+    "Trial Active": "Track usage, qualitative feedback, and research workflow value rather than treating trial access as the milestone.",
+    "Trial Follow-up": "Translate usage and feedback into next actions, product clarifications, or proposal readiness.",
+    "Negotiation": "Support pricing/security/procurement follow-up with proof of value and accountable outputs.",
+    "Won": "Capture the winning use case and expansion path.",
+    "Lost": "Capture reason, product gaps, timing, and nurture path.",
+    "Nurture": "Use relevant signals and product updates only when they map to the account's use case."
+  },
+  "requiredOutputChecks": [
+    "Name the account-specific myRA use case.",
+    "Name the relevant persona or role bucket.",
+    "Name the signal, evidence, or hypothesis being used.",
+    "Name the next AM decision or approval point.",
+    "Keep source trails where evidence affects the recommendation."
+  ]
+}

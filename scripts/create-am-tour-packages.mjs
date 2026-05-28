@@ -4,12 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const outputRoot = process.argv[2] ?? '/private/tmp/day-ai-am-tour-v2';
+const outputRoot = process.argv[2] ?? '/private/tmp/day-ai-am-tour-v3-ux';
 const rosterPath = 'templates/am-roster.csv';
 const seedPath = 'templates/am-account-seed-list.csv';
 const satyaReadyPath = 'templates/satya-ready-accounts.csv';
 const satyaReviewPath = 'templates/satya-identity-review.csv';
 const activeContactsPath = process.env.ACTIVE_CONTACTS_PATH ?? 'templates/am-active-contacts.csv';
+const uxGuidancePath = 'workflow/config/ux-guidance.json';
 const python = process.env.PYTHON ?? 'python3';
 
 const filesToCopy = [
@@ -30,6 +31,7 @@ const seedRows = readObjects(seedPath);
 const satyaReady = readObjects(satyaReadyPath);
 const satyaReview = readObjects(satyaReviewPath);
 const activeContacts = fs.existsSync(activeContactsPath) ? readObjects(activeContactsPath) : [];
+const uxGuidance = JSON.parse(fs.readFileSync(uxGuidancePath, 'utf8'));
 
 fs.rmSync(outputRoot, { recursive: true, force: true });
 fs.mkdirSync(outputRoot, { recursive: true });
@@ -170,7 +172,7 @@ function buildPacket(am, accounts, activeContacts) {
     contactsByAccount.get(key).push(contact);
   }
   return {
-    version: '2.0',
+    version: '3.1',
     generatedAt: new Date().toISOString(),
     am: {
       name: am.am_name,
@@ -178,9 +180,17 @@ function buildPacket(am, accounts, activeContacts) {
     },
     tour: {
       startPrompt: 'Start my myRA AM tour.',
+      beginnerPrompt: 'Start my myRA AM tour in beginner mode.',
+      standardPrompt: 'Start my myRA AM tour.',
+      powerPrompt: 'Start my myRA AM tour in power mode.',
       checkpointMode: true,
+      defaultMode: uxGuidance.defaultTourMode,
+      modes: uxGuidance.tourModes,
       recommendedFirstAccount: recommended?.accountName ?? null,
       recommendedFirstDomain: recommended?.domain ?? null,
+      recommendedReason: recommended ? recommendedReason(recommended) : null,
+      firstRunStations: uxGuidance.firstRunStations,
+      naturalPrompts: uxGuidance.naturalPromptRoutes.flatMap((route) => route.examples).slice(0, 18),
     },
     summary: {
       total: accounts.length,
@@ -195,11 +205,41 @@ function buildPacket(am, accounts, activeContacts) {
       ...account,
       ownerEmail: am.am_email,
       activeContacts: contactsByAccount.get(accountKey(account.domain, account.accountName)) ?? [],
+      recommendedReason: recommended && account.accountName === recommended.accountName
+        ? recommendedReason(account)
+        : '',
+      orgResolutionCommand: account.status === 'ready_for_intake'
+        ? `/org-resolution account_name="${escapePrompt(account.accountName)}" domain="${escapePrompt(account.domain)}" owner_email="${am.am_email}"`
+        : '',
       intakeCommand: account.status === 'ready_for_intake'
         ? `/account-intake account_name="${escapePrompt(account.accountName)}" domain="${escapePrompt(account.domain)}" owner_email="${am.am_email}"`
         : '',
     })),
     activeContacts,
+    workflowContext: {
+      myraContextPack: 'workflow/config/myra-context.json',
+      requiredInEveryRecommendation: true,
+      summary: 'Use myRA decision-grade, expert-validated intelligence positioning in research, ICP, contact, cadence, outreach, demo, trial, product update, and health outputs.',
+    },
+    ux: {
+      guidance: uxGuidancePath,
+      defaultTourMode: uxGuidance.defaultTourMode,
+      firstRunStations: uxGuidance.firstRunStations.map((station) => station.label),
+      receiptLevels: uxGuidance.receiptLevels,
+      trustPanelRequired: true,
+      trustPanelSections: uxGuidance.trustPanel.sections,
+      contactCardTiers: uxGuidance.contactCardTiers,
+      pendingSync: uxGuidance.pendingSync,
+    },
+    orgResolution: {
+      policy: 'workflow/config/org-resolution.json',
+      requiredBeforeAccountIntake: true,
+      exactDomainBehavior: 'auto_link_existing',
+      strongVariantBehavior: 'auto_link_existing_with_receipt',
+      parentSubsidiaryBehavior: 'ask_am_decision',
+      ambiguousBehavior: 'block_org_creation_create_review_context',
+      idempotentRetries: true,
+    },
     connectorAccess: {
       model: 'centralized_admin_runtime',
       amKeysRequired: false,
@@ -222,12 +262,31 @@ function buildPacket(am, accounts, activeContacts) {
       },
       fallback: 'Codex should create a Day AI connector request or pause with the exact payload; never ask the AM for API keys.',
     },
+    reliability: {
+      dayAiWriteMode: 'receipt_first_idempotent_retry',
+      onMcpFailure: 'show_pending_sync_and_retry_with_same_idempotency_key',
+      duplicatePrevention: 'never_create_second_organization_for_same_canonical_domain_or_match_key',
+      workerExecution: 'hosted_worker_only_for_production_writes',
+      workerEnvVars: ['WORKER_BASE_URL', 'WORKER_BEARER_TOKEN'],
+      onWorkerUnavailable: 'set_run_status_blocked_show_red_receipt',
+      receiptSchemaRef: '../schemas/account-receipt.schema.json',
+      tourRunStateSchemaRef: '../schemas/tour-run-state.schema.json',
+    },
+    adminReadiness: {
+      checks: uxGuidance.adminReadiness.checks.map((check) => ({
+        check,
+        status: 'not_started',
+        notes: '',
+      })),
+    },
     guardrails: [
       'No external sends.',
       'No Freshsales writes.',
       'No Apollo writes or sequences.',
       'No provider API keys in this package.',
+      'No Day AI Organization creation until smart org resolution clears the write.',
       'No canonical Day AI People without AM approval.',
+      'Every recommendation must include myRA-specific account/persona/stage context.',
       'Show Day AI handoff receipts before and after writes.',
     ],
   };
@@ -245,19 +304,29 @@ Open Codex in this folder and say:
 Start my myRA AM tour.
 \`\`\`
 
+If you want more step-by-step guidance, say:
+
+\`\`\`text
+Start my myRA AM tour in beginner mode.
+\`\`\`
+
 Expected setup time: under 10 minutes.
 
 Codex will:
 
 - Check Day AI MCP access.
 - Load \`account-packet.json\` for speed.
+- Load the shared myRA context pack.
+- Use ${packet.tour.defaultMode} mode by default, with beginner and power modes available.
 - Use \`MY_ACCOUNTS.xlsx\` as your cockpit.
 - Show your queue and recommend the next account.
+- Run smart Organization matching before account intake.
 - Pause before Day AI writes.
 - Show Day AI handoff receipts.
 - Request Freshsales/Apollo/Clearout evidence through centralized connectors when needed.
 
 Recommended first account: ${recommended}
+Why this account: ${packet.tour.recommendedReason ?? 'Codex will choose the next ready account by priority.'}
 
 If stuck, say:
 
@@ -266,8 +335,24 @@ Fix my Day AI connection.
 Resume my myRA AM tour.
 Show what has been saved to Day AI.
 Show accounts needing domains.
+Run smart org match for this account before intake.
+Retry pending Day AI sync for this account using the same idempotency key.
 \`\`\`
 `;
+}
+
+function recommendedReason(account) {
+  if (!account) return '';
+  if (account.priority === 'P1') {
+    return `${account.accountName} is the first pilot because it is marked P1, has a confirmed domain, and is ready for duplicate-safe intake.`;
+  }
+  if (account.status === 'ready_for_intake') {
+    return `${account.accountName} has a confirmed domain and is ready for duplicate-safe intake.`;
+  }
+  if (account.status === 'identity_review') {
+    return `${account.accountName} needs identity review before intake.`;
+  }
+  return `${account.accountName} needs domain confirmation before intake.`;
 }
 
 function readObjects(filePath) {

@@ -8,7 +8,7 @@
   "properties": {
     "candidateId": { "type": "string" },
     "accountDomain": { "type": "string" },
-    "sourceSystem": { "enum": ["freshsales", "apollo", "day_ai", "manual"] },
+    "sourceSystem": { "enum": ["freshsales", "apollo", "day_ai", "manual", "imported_active_contact", "import"] },
     "sourceIds": {
       "type": "object",
       "additionalProperties": { "type": "string" }

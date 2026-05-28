@@ -9,9 +9,31 @@ Contact sourcing is modular. Day AI remains the system of record; providers only
 | Freshsales | Existing CRM evidence and activity | Centralized connector | Read-only |
 | Apollo | Net-new contact sourcing and selective enrichment | Centralized connector | No Apollo writes |
 | Clearout | Selective email verification for enriched/imported candidates | Centralized connector | No Clearout writes |
+| Day AI | Canonical account/contact state | AM OAuth | Canonical writes after approval |
 
 AMs can request these provider actions from Codex, but keys remain centralized. If the connector is not reachable, Codex should create a connector request or pause with the exact request payload rather than asking the AM for credentials. See `docs/centralized-connectors.md`.
-| Day AI | Canonical account/contact state | AM OAuth | Canonical writes after approval |
+
+## Lead Identification Order
+
+Use this order for `/map-contacts`:
+
+1. Imported active contacts from the AM package.
+2. Apollo search for net-new candidates.
+3. Freshsales MI evidence for existing CRM contacts, leads, account context, deals, activities, notes, and conversations.
+4. Day AI existing People.
+5. Clearout verification only for selected or enriched emails.
+
+This order keeps known AM context visible, adds net-new coverage, then uses Freshsales as a relationship/history layer without treating old CRM activity as current AM outreach.
+
+## AM Contact Card UX
+
+Before showing dense tables, group candidates into cards:
+
+- `Recommended`: strong role fit and evidence; ask AM to approve, enrich, verify, or draft.
+- `Maybe`: useful but incomplete evidence; ask AM whether to keep, enrich, or skip.
+- `Hold`: weak fit, duplicate risk, bad email, or ambiguous company evidence.
+
+Each card should include source, role bucket, evidence score, enrichment state, Clearout verification state, and the safest next AM action.
 
 ## Apollo Search Fields
 
@@ -63,8 +85,10 @@ Use `/source-new-contacts` for AM-requested, connector-backed net-new sourcing:
 
 ```text
 account/domain
+  -> imported active contacts context
   -> Apollo People Search
   -> candidate ranking
+  -> Freshsales/Day AI duplicate evidence
   -> selective Apollo enrichment
   -> selective Clearout verification
   -> AM/admin approval

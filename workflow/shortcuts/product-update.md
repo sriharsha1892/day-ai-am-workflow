@@ -15,6 +15,8 @@ Optional:
 
 ## Reads
 
+- `workflow/config/myra-context.json` for stage/persona relevance checks.
+- `workflow/config/ux-guidance.json` for receipt labels and trust panel.
 - Day AI account research, lifecycle state, selected contacts, trial context, and prior touches.
 - `workflow/config/packs.json` plus Day AI AM/account pack context.
 
@@ -43,8 +45,10 @@ AM confirms relevance and recipients before drafts/tasks are created.
 
 - Recipient rationale.
 - Resolved persona/channel packs.
+- myRA use case or trial behavior that makes the update relevant.
 - Draft subject/body.
 - Suggested next step.
+- Trust panel: sources used, confidence, AM judgment needed, what Codex did not do, and next safest action.
 
 ## Done Criteria
 

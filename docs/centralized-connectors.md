@@ -24,6 +24,7 @@ AM Codex package
 | Source net-new contacts for an account | Apollo | `/source-new-contacts`, `/map-contacts` |
 | Enrich selected/top-ranked candidate contacts | Apollo | `/source-new-contacts` |
 | Verify selected candidate emails | Clearout | `/verify-contact-email`, `/source-new-contacts` |
+| Resolve duplicate-safe account identity | Day AI + Freshsales + Apollo | `/org-resolution`, `/account-intake` |
 
 ## What AMs Never Need
 
@@ -48,6 +49,8 @@ account name + domain
 
 Freshsales history can explain context. It does not count as active AM outreach unless the AM selects/logs it into Day AI.
 
+Freshsales evidence also feeds smart Organization matching. The connector should return sales account IDs, account aliases, linked contact email domains, deal/account references, notes, activities, and conversation clues so Codex can decide whether to link, ask, block, or create in Day AI.
+
 ## Apollo Flow
 
 Apollo is for net-new contact discovery and selective enrichment.
@@ -63,6 +66,8 @@ account domain + persona pack
 ```
 
 Do not create Apollo sequences or write back to Apollo in this workflow.
+
+Apollo organization IDs and domains should be preserved as source evidence for org resolution. Apollo people search should run after imported active contacts and before Freshsales contact evidence in the default lead-identification sequence, with enrichment reserved for AM-approved or top-ranked candidates.
 
 ## Clearout Flow
 
@@ -86,6 +91,14 @@ Codex should not ask the AM for keys. It should either:
 - pause and show the exact provider/action/account payload needed.
 
 The AM-facing message should say what will happen next, not expose provider internals.
+
+For Day AI MCP instability, Codex should keep a local receipt of the intended write, use an idempotency key for retries, and show `pending sync` instead of repeating the write blindly.
+
+AM-facing connector outputs should use the same Green/Yellow/Red UX:
+
+- Green: provider evidence is usable or write saved.
+- Yellow: AM/admin decision needed, such as paid enrichment or parent/subsidiary scope.
+- Red: provider unavailable, ambiguous identity, failed write, or unsafe email.
 
 ## Approval Boundaries
 

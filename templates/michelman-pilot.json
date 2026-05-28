@@ -1,0 +1,44 @@
+{
+  "$schema": "../workflow/schemas/account-motion.schema.json",
+  "account": {
+    "name": "Michelman",
+    "domain": "michelman.com",
+    "canonicalDomain": "michelman.com",
+    "aliases": ["Michelman, Inc.", "Michelman Inc"],
+    "parentCompany": null,
+    "subsidiaries": []
+  },
+  "orgResolution": {
+    "matchStatus": "pending"
+  },
+  "lifecycle": {
+    "stage": "Researching",
+    "stageReason": "First all-tools production test account.",
+    "nextBestAction": "Run worker-resolve-identity to confirm or link Day AI Organization.",
+    "ownerEmail": "satya@ask-myra.ai"
+  },
+  "research": {
+    "myraUseCases": [
+      "Specialty chemicals + coatings supplier intelligence",
+      "Market intelligence on competitive resin/water-based coatings",
+      "Customer (downstream packaging/printing) trend monitoring"
+    ],
+    "buyerHypothesis": "Strategy/Innovation leaders at a specialty chemicals firm need decision-grade market intelligence to track competitor moves and customer demand shifts in water-based coatings.",
+    "sourceUrls": ["https://www.michelman.com"]
+  },
+  "packs": {
+    "personaPack": "balanced",
+    "cadencePack": "new-contact-standard",
+    "channelPack": "email-call",
+    "source": "provisioning",
+    "savedToDayAiAccountContext": false,
+    "amProfileUpdateRequested": false
+  },
+  "contacts": [],
+  "ledger": [],
+  "runState": {
+    "runStatus": "dry_run_complete",
+    "stationsComplete": [],
+    "pendingSyncCount": 0
+  }
+}

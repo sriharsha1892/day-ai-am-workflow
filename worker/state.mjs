@@ -163,3 +163,8 @@ export async function nextResume(amEmail) {
 export function stateBackendKind() {
   return pickBackend().kind;
 }
+
+// List the canonical domains an AM has any tour state for (used by team insights).
+export async function listTourDomains(amEmail) {
+  return pickBackend().listDomains(amEmail);
+}

@@ -11,6 +11,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { initializeServer, serverOptions } from '../worker/mcp.mjs';
 import { verifyAccessToken } from '../worker/oauth/broker.mjs';
+import { recordLastSeen } from '../worker/insights.mjs';
 
 export const config = { runtime: 'nodejs', maxDuration: 60 };
 
@@ -43,6 +44,7 @@ async function verifyToken(_req, bearerToken) {
 
   const broker = await verifyAccessToken(bearerToken).catch(() => null);
   if (broker) {
+    void recordLastSeen(broker.amEmail); // fire-and-forget rollout telemetry
     return {
       token: bearerToken,
       clientId: broker.amEmail,
@@ -53,6 +55,7 @@ async function verifyToken(_req, bearerToken) {
 
   const amEmail = parseTokenMap(process.env.WORKER_BEARER_TOKENS).get(bearerToken);
   if (amEmail) {
+    void recordLastSeen(amEmail);
     return { token: bearerToken, clientId: amEmail, scopes: ['myra:use'], extra: { amEmail } };
   }
 

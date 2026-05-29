@@ -31,6 +31,7 @@ import {
   unassignAccount,
   listAllAssignments,
 } from './accounts.mjs';
+import { teamBrief, assignmentHealth, rolloutStatus } from './insights.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
 for (const candidate of ['worker/.env', '.env.local']) {
@@ -493,6 +494,53 @@ export function initializeServer(server) {
         return ok(await listAllAssignments());
       } catch (e) {
         return fail(`list_all_assignments failed: ${e.message}`);
+      }
+    },
+  );
+
+  // ---- Team insights ----
+
+  server.registerTool(
+    'team_brief',
+    {
+      description: 'Team activity over a window (default 7 days): per-AM accounts touched, drafts, contacts approved, actions, and blockers. Team-level rollup.',
+      inputSchema: { windowDays: z.number().optional() },
+    },
+    async (args) => {
+      try {
+        return ok(await teamBrief({ windowDays: args.windowDays ?? 7 }));
+      } catch (e) {
+        return fail(`team_brief failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'assignment_health',
+    {
+      description: 'Assignment health: cross-AM duplicate-domain conflicts, P1 accounts untouched 14+ days, and overloaded AMs.',
+      inputSchema: { overloadThreshold: z.number().optional(), staleDays: z.number().optional() },
+    },
+    async (args) => {
+      try {
+        return ok(await assignmentHealth(args));
+      } catch (e) {
+        return fail(`assignment_health failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'rollout_status',
+    {
+      description: "Who's connected / onboarded / active across the AM roster, summarized in plain words.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return ok(await rolloutStatus());
+      } catch (e) {
+        return fail(`rollout_status failed: ${e.message}`);
       }
     },
   );

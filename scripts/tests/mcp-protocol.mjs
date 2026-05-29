@@ -39,3 +39,6 @@ for (const [method, key] of [
   const items = parsed.result?.[key] ?? [];
   process.stdout.write(`${method} HTTP ${res.status} — ${items.length}: ${items.map((i) => i.name).join(', ')}\n`);
 }
+
+// mcp-handler keeps a handle open; exit explicitly so the script doesn't hang.
+process.exit(0);

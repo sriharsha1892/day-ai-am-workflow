@@ -10,7 +10,9 @@
 import { lookupIdempotency, recordIdempotency } from '../store.mjs';
 
 const TOKEN_BUFFER_MS = 60_000;
-let tokenCache = null;
+// Access-token cache keyed by the refresh token used (shared integration token OR a
+// per-AM token from the OAuth broker), so per-AM and shared tokens cache independently.
+const tokenCaches = new Map();
 
 function baseUrl() {
   return (process.env.DAY_AI_BASE_URL ?? 'https://day.ai').replace(/\/+$/, '');
@@ -37,9 +39,16 @@ export async function probe() {
   }
 }
 
-async function ensureAccessToken() {
-  if (tokenCache && tokenCache.expiresAt > Date.now() + TOKEN_BUFFER_MS) {
-    return tokenCache.accessToken;
+// refreshOverride: a specific AM's Day AI refresh token (from the OAuth broker) so the
+// write is attributed to that AM. Omitted → the shared integration REFRESH_TOKEN.
+async function ensureAccessToken(refreshOverride) {
+  const refreshToken = refreshOverride ?? process.env.REFRESH_TOKEN;
+  if (!refreshToken) throw new Error('No Day AI refresh token available');
+  const cacheKey = refreshOverride ? `am:${refreshOverride.slice(-12)}` : 'shared';
+
+  const cached = tokenCaches.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + TOKEN_BUFFER_MS) {
+    return cached.accessToken;
   }
 
   const response = await fetch(`${baseUrl()}/api/oauth`, {
@@ -49,7 +58,7 @@ async function ensureAccessToken() {
       grant_type: 'refresh_token',
       client_id: process.env.CLIENT_ID,
       client_secret: process.env.CLIENT_SECRET,
-      refresh_token: process.env.REFRESH_TOKEN,
+      refresh_token: refreshToken,
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -61,15 +70,13 @@ async function ensureAccessToken() {
 
   const data = await response.json();
   const expiresIn = data.expires_in ?? 3600;
-  tokenCache = {
-    accessToken: data.access_token,
-    expiresAt: Date.now() + expiresIn * 1000,
-  };
-  return tokenCache.accessToken;
+  const entry = { accessToken: data.access_token, expiresAt: Date.now() + expiresIn * 1000 };
+  tokenCaches.set(cacheKey, entry);
+  return entry.accessToken;
 }
 
-async function mcpCallTool(toolName, args = {}) {
-  const accessToken = await ensureAccessToken();
+async function mcpCallTool(toolName, args = {}, refreshOverride) {
+  const accessToken = await ensureAccessToken(refreshOverride);
   const response = await fetch(`${baseUrl()}/api/mcp`, {
     method: 'POST',
     headers: {
@@ -320,7 +327,7 @@ const WRITE_HANDLERS = {
   },
 };
 
-export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempotencyKey, retry, ...rest }) {
+export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempotencyKey, retry, dayAiToken, ...rest }) {
   if (!approvingAm) throw new Error('approvingAm required for Day AI writes');
   if (!idempotencyKey) throw new Error('idempotencyKey required for Day AI writes');
 
@@ -347,7 +354,9 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
     record = out.record;
     type = out.type;
   } else {
-    const result = await mcpCallTool(handler.tool, handler.args(payload));
+    // dayAiToken (the signed-in AM's refresh token) attributes the write to that AM;
+    // undefined falls back to the shared integration token.
+    const result = await mcpCallTool(handler.tool, handler.args(payload), dayAiToken);
     const parsed = parseMcpResult(result);
     record = handler.extractRecord(parsed, payload);
     type = handler.type;

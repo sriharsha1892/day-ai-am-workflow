@@ -33,6 +33,9 @@ export async function sadd(setKey, member) {
 export async function smembers(setKey) {
   return pick().smembers(setKey);
 }
+export async function srem(setKey, member) {
+  return pick().srem(setKey, member);
+}
 
 function pick() {
   if (backend) return backend;
@@ -63,6 +66,9 @@ function redis(client) {
     },
     async smembers(setKey) {
       return (await client.smembers(setKey)) ?? [];
+    },
+    async srem(setKey, member) {
+      await client.srem(setKey, member);
     },
   };
 }
@@ -105,6 +111,11 @@ function disk() {
     },
     async smembers(setKey) {
       return (await this.get(setKey)) ?? [];
+    },
+    async srem(setKey, member) {
+      const cur = (await this.get(setKey)) ?? [];
+      const next = cur.filter((m) => m !== member);
+      await this.set(setKey, next);
     },
   };
 }

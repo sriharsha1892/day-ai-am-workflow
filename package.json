@@ -43,8 +43,11 @@
     "worker:dayai-onboard": "node scripts/worker-dayai-onboard.mjs",
     "michelman:pilot": "node scripts/michelman-pilot.mjs",
     "issue-am-token": "node scripts/issue-am-token.mjs",
+    "accounts:validate": "node scripts/validate-master-account-list.mjs",
+    "accounts:load": "node scripts/load-account-lists.mjs",
+    "accounts:dump": "node scripts/dump-account-lists.mjs",
     "test:all": "node scripts/tests/run-all.mjs",
-    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:workflow-configs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import && npm run check:org-duplicates && npm run validate:tour-run-state"
+    "validate:all": "npm run validate:roster && npm run validate:packs && npm run validate:workflow-configs && npm run validate:account-seeds && npm run validate:satya-ready && npm run validate:active-contacts && npm run validate:assignments && npm run validate:trial-import && npm run check:org-duplicates && npm run validate:tour-run-state && npm run accounts:validate"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

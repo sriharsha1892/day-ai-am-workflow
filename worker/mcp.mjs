@@ -24,6 +24,13 @@ import {
   markStation,
   nextResume,
 } from './state.mjs';
+import {
+  listMyAccounts,
+  getAccount,
+  assignAccounts,
+  unassignAccount,
+  listAllAssignments,
+} from './accounts.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
 for (const candidate of ['worker/.env', '.env.local']) {
@@ -390,6 +397,103 @@ export function initializeServer(server) {
       ]);
       const summ = (s) => (s.status === 'fulfilled' ? { ok: Boolean(s.value?.ok), ...s.value } : { ok: false, reason: String(s.reason?.message ?? s.reason) });
       return ok({ freshsales: summ(fsp), apollo: summ(ap), clearout: summ(cl), dayAi: summ(da) });
+    },
+  );
+
+  // ---- Account assignments (central, replaces MY_ACCOUNTS.xlsx) ----
+
+  server.registerTool(
+    'list_my_accounts',
+    {
+      description:
+        "The signed-in AM's assigned account list (the answer to 'what are my accounts?'), sorted by status then priority. Replaces opening a spreadsheet. Optional status filter (e.g. ready_for_intake).",
+      inputSchema: { status: z.string().optional() },
+    },
+    async (args, extra) => {
+      try {
+        return ok(await listMyAccounts(amEmailFrom(extra), { status: args.status }));
+      } catch (e) {
+        return fail(`list_my_accounts failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_account',
+    {
+      description: "Fetch one of the AM's assigned accounts by domain or name, merged with live tour progress.",
+      inputSchema: { account: z.string() },
+    },
+    async (args, extra) => {
+      try {
+        return ok(await getAccount(amEmailFrom(extra), args.account));
+      } catch (e) {
+        return fail(`get_account failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'assign_accounts',
+    {
+      description:
+        'Assign or reassign one or more accounts. Any AM may self-serve; an account belongs to one AM at a time (reassigning moves it and records reassignedFrom). amEmail defaults to the caller when omitted (self-assign).',
+      inputSchema: {
+        assignments: z.array(
+          z.object({
+            amEmail: z.string().optional(),
+            amName: z.string().optional(),
+            accountName: z.string(),
+            domain: z.string().optional(),
+            status: z.string().optional(),
+            priority: z.string().optional(),
+            personaPack: z.string().optional(),
+            cadencePack: z.string().optional(),
+            channelPack: z.string().optional(),
+            notes: z.string().optional(),
+          }),
+        ),
+      },
+    },
+    async (args, extra) => {
+      const actor = amEmailFrom(extra);
+      const rows = (args.assignments ?? []).map((r) => ({ ...r, amEmail: r.amEmail ?? actor }));
+      try {
+        return ok(await assignAccounts(actor, rows));
+      } catch (e) {
+        return fail(`assign_accounts failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'unassign_account',
+    {
+      description: 'Remove an account assignment (offboarding or part of a reassignment). amEmail defaults to the caller.',
+      inputSchema: { amEmail: z.string().optional(), accountId: z.string() },
+    },
+    async (args, extra) => {
+      const actor = amEmailFrom(extra);
+      try {
+        return ok(await unassignAccount(actor, { amEmail: args.amEmail ?? actor, accountId: args.accountId }));
+      } catch (e) {
+        return fail(`unassign_account failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'list_all_assignments',
+    {
+      description: 'Team view: every AM’s assignments, totals, and any account owned by more than one AM (conflicts).',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return ok(await listAllAssignments());
+      } catch (e) {
+        return fail(`list_all_assignments failed: ${e.message}`);
+      }
     },
   );
 

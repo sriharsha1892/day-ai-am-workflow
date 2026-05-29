@@ -32,6 +32,35 @@ async function apolloFetch(endpoint, body) {
   return text ? JSON.parse(text) : {};
 }
 
+// Apollo's newer search endpoints (mixed_people/api_search) take params in the QUERY STRING with
+// bracket array notation, not a JSON body — and live under /api/v1, not /v1.
+async function apolloApiSearch(path, params) {
+  const url = new URL(`https://api.apollo.io${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) if (item !== undefined && item !== null && item !== '') url.searchParams.append(key, String(item));
+    } else {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  // Auth both ways: header (current endpoints) and api_key query param (some search endpoints
+  // expect it inline). Whichever Apollo honors for api_search, we're covered.
+  url.searchParams.set('api_key', apiKey());
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache', accept: 'application/json', 'X-Api-Key': apiKey() },
+    signal: AbortSignal.timeout(30_000),
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const err = new Error(`Apollo ${response.status}: ${safeMessage(text)}`);
+    err.status = response.status;
+    throw err;
+  }
+  return text ? JSON.parse(text) : {};
+}
+
 export async function probe() {
   const response = await fetch('https://api.apollo.io/v1/auth/health', {
     headers: { 'X-Api-Key': apiKey() },
@@ -65,9 +94,10 @@ export async function apolloPeopleSearch({ canonicalDomain, personaPack = 'balan
 
   let data;
   try {
-    data = await apolloFetch('/v1/mixed_people/search', {
-      q_organization_domains: canonicalDomain,
-      person_titles: keywords,
+    // New (non-deprecated) people search: /api/v1/mixed_people/api_search, params in query string.
+    data = await apolloApiSearch('/api/v1/mixed_people/api_search', {
+      'q_organization_domains_list[]': [canonicalDomain],
+      'person_titles[]': keywords,
       per_page: Math.min(limit, 25),
       page: 1,
     });

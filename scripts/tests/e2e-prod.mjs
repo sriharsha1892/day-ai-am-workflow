@@ -158,18 +158,18 @@ async function main() {
     await send('notifications/initialized', {}, true);
   }
 
-  // 5. tools/list → 27 tools (count + a few expected names).
+  // 5. tools/list → 28 tools (count + a few expected names).
   {
     const r = await send('tools/list', {});
     const tools = r.json?.result?.tools ?? [];
     const names = new Set(tools.map((t) => t.name));
     const expected = ['resolve_identity', 'apollo_search', 'list_my_accounts', 'build_receipt', 'compose_first_touch'];
     const haveExpected = expected.every((n) => names.has(n));
-    check('05a tools/list: exactly 27 tools', tools.length === 27, `got ${tools.length}`);
+    check('05a tools/list: exactly 28 tools', tools.length === 28, `got ${tools.length}`);
     check('05b tools/list: expected tool names present', haveExpected, expected.join(', '));
   }
 
-  // 6. prompts/list → 5 ; resources/list → 5.
+  // 6. prompts/list → 5 ; resources/list → 6.
   {
     const p = await send('prompts/list', {});
     const prompts = p.json?.result?.prompts ?? [];
@@ -177,7 +177,7 @@ async function main() {
 
     const res = await send('resources/list', {});
     const resources = res.json?.result?.resources ?? [];
-    check('06b resources/list: 5 resources', resources.length === 5, `got ${resources.length}`);
+    check('06b resources/list: 6 resources', resources.length === 6, `got ${resources.length}`);
   }
 
   // 7. resolve_identity → decision.receiptColor = green.

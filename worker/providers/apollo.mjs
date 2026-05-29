@@ -98,6 +98,8 @@ export async function apolloPeopleSearch({ canonicalDomain, personaPack = 'balan
     data = await apolloApiSearch('/api/v1/mixed_people/api_search', {
       'q_organization_domains_list[]': [canonicalDomain],
       'person_titles[]': keywords,
+      // Focus on decision-makers so results are tier-able (excludes entry/intern/senior-IC noise).
+      'person_seniorities[]': ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director', 'manager'],
       per_page: Math.min(limit, 25),
       page: 1,
     });
@@ -167,32 +169,37 @@ export async function apolloEnrich({ candidateIds, approvingAm }) {
   };
 }
 
-function normalizePerson(p, roleBuckets) {
+export function normalizePerson(p, roleBuckets) {
   const title = p.title ?? p.headline ?? '';
   const email = p.email ?? null;
   const emailStatus = p.email_status ?? null;
   const matchedRoleBucket = matchRoleBucket(title, roleBuckets);
   const seniority = p.seniority ?? '';
 
-  let tier = 'Hold';
-  let tierReason = 'weak role fit';
+  // Tier on what SEARCH actually returns: title→persona fit + seniority. The email address is
+  // masked until enrich, so it must NOT gate tiering here (that bug put everyone in Hold). Only a
+  // known-unreachable email (email_status 'unavailable') forces Hold. Reachability is confirmed
+  // later by enrich + Clearout.
+  const seniorityStr = String(seniority).toLowerCase();
+  const isSenior = ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director'].some((s) => seniorityStr.includes(s));
+  const isMid = seniorityStr.includes('manager');
+  const roleFit = Boolean(matchedRoleBucket);
+  const emailUnreachable = emailStatus === 'unavailable';
 
-  const seniorityRank = ['c_suite', 'founder', 'vp', 'head', 'director', 'manager'].some((s) =>
-    String(seniority).toLowerCase().includes(s),
-  );
-  const hasGoodTitle = matchedRoleBucket && seniorityRank;
-  const hasOkTitle = matchedRoleBucket || seniorityRank;
-  const hasUsableEmail = emailStatus === 'verified' || emailStatus === 'likely_to_engage';
-
-  if (hasGoodTitle && hasUsableEmail) {
-    tier = 'Recommended';
-    tierReason = `strong fit: ${matchedRoleBucket}, ${seniority}`;
-  } else if (hasGoodTitle || (hasOkTitle && email)) {
-    tier = 'Maybe';
-    tierReason = matchedRoleBucket ? `role fit but evidence incomplete` : `seniority fit, role unclear`;
-  } else if (!email) {
+  let tier;
+  let tierReason;
+  if (emailUnreachable) {
     tier = 'Hold';
-    tierReason = 'no email found';
+    tierReason = 'no reachable email at this account';
+  } else if (roleFit && (isSenior || isMid)) {
+    tier = 'Recommended';
+    tierReason = `strong fit: ${matchedRoleBucket}${seniority ? `, ${seniority}` : ''}`;
+  } else if (roleFit || isSenior) {
+    tier = 'Maybe';
+    tierReason = roleFit ? 'role fit; seniority unclear' : `senior (${seniority || 'leader'}); role unclear`;
+  } else {
+    tier = 'Hold';
+    tierReason = 'weak role/seniority fit';
   }
 
   return {

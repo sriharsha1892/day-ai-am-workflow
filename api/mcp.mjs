@@ -10,6 +10,7 @@
 
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { initializeServer, serverOptions } from '../worker/mcp.mjs';
+import { verifyAccessToken } from '../worker/oauth/broker.mjs';
 
 export const config = { runtime: 'nodejs', maxDuration: 60 };
 
@@ -31,19 +32,37 @@ function parseTokenMap(raw) {
   return map;
 }
 
+// Dual-mode auth (maximum flexibility):
+//   1. Broker-issued OAuth token (codex mcp login) -> carries the AM's Day AI refresh token
+//      so writes are attributed to the AM.
+//   2. Static bearer from WORKER_BEARER_TOKENS (codex mcp add --bearer-token) -> service
+//      accounts, testing, or AMs who can't OAuth. Falls back to the shared Day AI token.
+// Neither path is privileged; both coexist. Swapping the IdP changes path 1 only.
 async function verifyToken(_req, bearerToken) {
   if (!bearerToken) return undefined;
+
+  const broker = await verifyAccessToken(bearerToken).catch(() => null);
+  if (broker) {
+    return {
+      token: bearerToken,
+      clientId: broker.amEmail,
+      scopes: ['myra:use'],
+      extra: { amEmail: broker.amEmail, dayAiRefreshToken: broker.downstream?.refreshToken },
+    };
+  }
+
   const amEmail = parseTokenMap(process.env.WORKER_BEARER_TOKENS).get(bearerToken);
-  if (!amEmail) return undefined;
-  return {
-    token: bearerToken,
-    clientId: amEmail,
-    scopes: ['myra:use'],
-    extra: { amEmail },
-  };
+  if (amEmail) {
+    return { token: bearerToken, clientId: amEmail, scopes: ['myra:use'], extra: { amEmail } };
+  }
+
+  return undefined;
 }
 
-const authedHandler = withMcpAuth(mcpHandler, verifyToken, { required: true });
+const authedHandler = withMcpAuth(mcpHandler, verifyToken, {
+  required: true,
+  resourceMetadataPath: '/.well-known/oauth-protected-resource',
+});
 
 export default async function vercelMcp(req, res) {
   try {

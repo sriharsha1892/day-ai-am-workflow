@@ -2,14 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "functions": {
-    "api/index.mjs": {
-      "maxDuration": 60
-    },
-    "api/mcp.mjs": {
-      "maxDuration": 60
-    }
+    "api/index.mjs": { "maxDuration": 60 },
+    "api/mcp.mjs": { "maxDuration": 60 },
+    "api/auth.mjs": { "maxDuration": 30 }
   },
   "rewrites": [
+    { "source": "/.well-known/(.*)", "destination": "/api/auth" },
+    { "source": "/auth/(.*)", "destination": "/api/auth" },
     { "source": "/mcp", "destination": "/api/mcp" },
     { "source": "/mcp/(.*)", "destination": "/api/mcp" },
     { "source": "/(.*)", "destination": "/api" }

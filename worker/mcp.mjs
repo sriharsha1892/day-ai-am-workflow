@@ -36,6 +36,7 @@ import { prepareLinkedinTouch } from './providers/linkedin.mjs';
 import { composeFirstTouch } from './compose.mjs';
 import { getPreferences, setPreferences } from './preferences.mjs';
 import { runWorkContactLoop, checkRecentTouch } from './outreach.mjs';
+import { myCredits, teamCredits } from './credits.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
 for (const candidate of ['worker/.env', '.env.local']) {
@@ -78,6 +79,21 @@ Resolve the persona/cadence/channel packs, then walk each step's fields in seque
 
 ## Cross-session
 On a fresh session, call next_resume to find the AM's highest-priority unfinished account and offer to continue it. On "bye"/"wrap up", summarize the session.
+
+## Account list
+"What are my accounts?" → call list_my_accounts (the AM's central assignment list; the xlsx is retired). guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health, team_brief, rollout_status, team_credits.
+
+## Per-contact outreach (work-contact)
+For "work this contact" / "work the next one": call work_contact. It runs email discovery+verification (Apollo+Clearout) and the LinkedIn note prep in parallel, then composes a NON-SALESY, designation-aware first touch (goal: earn ~15 min for a call, never pitch). Show ONE card: email + verdict glyph; the LinkedIn note + profile URL ("copy, open, send" — you send it manually, LinkedIn is never automated); the draft. Warn if recentTouch is set. Then STOP for approve/edit/skip. On approval only: dayai_write draft-create + action-create channel:linkedin. Before spending Apollo/Clearout credits, surface the cost (credits tool). "Work all the Recommended" → run work_contact per selected contact and present one stacked review list with approve-all / veto-by-name.
+
+## Preferences
+Honor the AM's saved preferences (get_my_preferences) — signature, default tone — in every draft; offer set_my_preferences when they express a standing choice ("always sign me as…").
+
+## Micro-delights (how to speak)
+- Greet by name; use relative dates ("emailed 12 days ago", never an ISO timestamp); warm empty states ("Nothing needs a first touch — you're all caught up").
+- Status glyphs on verdicts: ✅ verified / ⚠️ risky / ❌ invalid; show the LinkedIn note's char count ("247/300 ✓").
+- End a contact loop with a quiet closure line ("Email verified, note staged, draft ready — you're set") and the one phrase to continue ("Say 'work the next one'").
+- Echo applied defaults ("using your usual consultative tone"); after a draft, offer "warmer or punchier?". No points, no leaderboards.
 
 Keep every recommendation grounded in myRA positioning: decision-grade, expert-validated market/competitor/customer/supplier/trend intelligence.`;
 
@@ -667,6 +683,38 @@ export function initializeServer(server) {
         return ok(await setPreferences(amEmailFrom(extra), args));
       } catch (e) {
         return fail(`set_my_preferences failed: ${e.message}`);
+      }
+    },
+  );
+
+  // ---- Credit awareness ----
+
+  server.registerTool(
+    'credits',
+    {
+      description: "The signed-in AM's Apollo/Clearout usage this month + remaining Clearout balance. Shown before credit-spending actions.",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      try {
+        return ok(await myCredits(amEmailFrom(extra)));
+      } catch (e) {
+        return fail(`credits failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'team_credits',
+    {
+      description: 'Team-wide Apollo/Clearout spend this month, per AM, with Clearout runway in plain words ("~2 weeks left at current pace").',
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        return ok(await teamCredits());
+      } catch (e) {
+        return fail(`team_credits failed: ${e.message}`);
       }
     },
   );

@@ -124,6 +124,10 @@ export async function apolloEnrich({ candidateIds, approvingAm }) {
       enriched.push({ apolloPersonId: id, status: 'failed', error: error.message });
     }
   }
+  if (creditsConsumed) {
+    const { recordUsage } = await import('../credits.mjs');
+    await recordUsage(approvingAm, 'apollo', creditsConsumed);
+  }
   return {
     status: enriched.length === 0 ? 'failed' : 'ok',
     enriched,

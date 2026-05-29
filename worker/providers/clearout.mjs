@@ -83,6 +83,11 @@ export async function clearoutVerify({ emails = [], approvingAm, reason }) {
   const invalid = results.filter((r) => r.status === 'invalid').length;
   const allFailed = results.length > 0 && results.every((r) => r.status === 'failed');
 
+  if (creditsConsumed) {
+    const { recordUsage } = await import('../credits.mjs');
+    await recordUsage(approvingAm, 'clearout', creditsConsumed);
+  }
+
   return {
     status: allFailed ? 'failed' : 'ok',
     verified,

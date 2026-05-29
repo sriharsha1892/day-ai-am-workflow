@@ -17,6 +17,23 @@ export function kvBackendKind() {
   return pick().kind;
 }
 
+// Top-level API — delegate to the chosen backend.
+export async function get(key) {
+  return pick().get(key);
+}
+export async function set(key, value, opts = {}) {
+  return pick().set(key, value, opts);
+}
+export async function del(key) {
+  return pick().del(key);
+}
+export async function sadd(setKey, member) {
+  return pick().sadd(setKey, member);
+}
+export async function smembers(setKey) {
+  return pick().smembers(setKey);
+}
+
 function pick() {
   if (backend) return backend;
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;

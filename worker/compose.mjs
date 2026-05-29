@@ -114,7 +114,15 @@ export function composeFirstTouch(input) {
       signalNamed: Boolean(accountAngle || proofPoint),
       nextDecisionNamed: true,
     },
-    queueReady: emailVerdict !== 'invalid',
+    // Verified-only queue (locked decision; protects the <5% bounce target): only a Clearout
+    // 'verified' email is queue-ready. risky / unknown / failed / invalid → hold for review.
+    queueReady: emailVerdict === 'verified',
+    queueHold:
+      emailVerdict === 'verified'
+        ? null
+        : emailVerdict === 'invalid'
+          ? 'invalid email — cannot send'
+          : `email ${emailVerdict} — held for review (queue is verified-only)`,
     rationale: `Framed for ${frameKey} (${seniority || tier}); angle: ${hook}.`,
     canonicalDomain,
   };

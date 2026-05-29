@@ -3,6 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { cached, enrichKey, apolloSearchKey, TTL } from '../cache.mjs';
 
 const PACKS = JSON.parse(fs.readFileSync(path.resolve('workflow/config/packs.json'), 'utf8'));
 
@@ -83,7 +84,7 @@ export async function fetchApolloOrgByDomain(domain) {
   }
 }
 
-export async function apolloPeopleSearch({ canonicalDomain, personaPack = 'balanced', targetRoleBuckets = [], titleKeywords = [], limit = 25 }) {
+export async function apolloPeopleSearch({ canonicalDomain, personaPack = 'balanced', targetRoleBuckets = [], titleKeywords = [], limit = 25, refresh = false }) {
   if (!canonicalDomain) {
     return { status: 'no_data', candidateCount: 0, candidates: [], tieredCounts: { recommended: 0, maybe: 0, hold: 0 } };
   }
@@ -92,65 +93,92 @@ export async function apolloPeopleSearch({ canonicalDomain, personaPack = 'balan
   const roleBuckets = targetRoleBuckets.length > 0 ? targetRoleBuckets : pack?.roleBuckets ?? [];
   const keywords = titleKeywords.length > 0 ? titleKeywords : roleBuckets;
 
-  let data;
-  try {
-    // New (non-deprecated) people search: /api/v1/mixed_people/api_search, params in query string.
-    data = await apolloApiSearch('/api/v1/mixed_people/api_search', {
-      'q_organization_domains_list[]': [canonicalDomain],
-      'person_titles[]': keywords,
-      // Focus on decision-makers so results are tier-able (excludes entry/intern/senior-IC noise).
-      'person_seniorities[]': ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director', 'manager'],
-      per_page: Math.min(limit, 25),
-      page: 1,
-    });
-  } catch (error) {
-    return {
-      status: 'failed',
-      candidateCount: 0,
-      candidates: [],
-      tieredCounts: { recommended: 0, maybe: 0, hold: 0 },
-      headlineReason: error.message,
-    };
-  }
+  // Cache successful searches 24h (review P1/P2): a re-search and every buildReceipt would
+  // otherwise re-hit the live API and re-normalize. Only 'ok' results are cached so an empty
+  // or failed search is retried.
+  const res = await cached(
+    apolloSearchKey({ canonicalDomain, personaPack, roleBuckets }),
+    TTL.apolloSearch,
+    async () => {
+      let data;
+      try {
+        // New (non-deprecated) people search: /api/v1/mixed_people/api_search, params in query string.
+        data = await apolloApiSearch('/api/v1/mixed_people/api_search', {
+          'q_organization_domains_list[]': [canonicalDomain],
+          'person_titles[]': keywords,
+          // Focus on decision-makers so results are tier-able (excludes entry/intern/senior-IC noise).
+          'person_seniorities[]': ['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director', 'manager'],
+          per_page: Math.min(limit, 25),
+          page: 1,
+        });
+      } catch (error) {
+        return {
+          status: 'failed',
+          canonicalDomain,
+          personaPack,
+          candidateCount: 0,
+          candidates: [],
+          tieredCounts: { recommended: 0, maybe: 0, hold: 0 },
+          creditsConsumed: 0,
+          headlineReason: error.message,
+        };
+      }
 
-  const rawPeople = (data?.people ?? data?.contacts ?? []).slice(0, limit);
-  const candidates = rawPeople.map((p) => normalizePerson(p, roleBuckets));
-  const tieredCounts = candidates.reduce(
-    (acc, c) => {
-      acc[c.tier.toLowerCase()] += 1;
-      return acc;
+      const rawPeople = (data?.people ?? data?.contacts ?? []).slice(0, limit);
+      const candidates = rawPeople.map((p) => normalizePerson(p, roleBuckets));
+      const tieredCounts = candidates.reduce(
+        (acc, c) => {
+          acc[c.tier.toLowerCase()] += 1;
+          return acc;
+        },
+        { recommended: 0, maybe: 0, hold: 0 },
+      );
+
+      return {
+        status: candidates.length === 0 ? 'no_data' : 'ok',
+        canonicalDomain,
+        personaPack,
+        candidateCount: candidates.length,
+        candidates,
+        tieredCounts,
+        creditsConsumed: 0,
+        headlineReason:
+          candidates.length === 0
+            ? 'Apollo returned no candidates for this domain + persona filter.'
+            : `${candidates.length} candidates (${tieredCounts.recommended} Recommended / ${tieredCounts.maybe} Maybe / ${tieredCounts.hold} Hold).`,
+      };
     },
-    { recommended: 0, maybe: 0, hold: 0 },
+    { refresh, shouldCache: (v) => v.status === 'ok' },
   );
 
-  return {
-    status: candidates.length === 0 ? 'no_data' : 'ok',
-    canonicalDomain,
-    personaPack,
-    candidateCount: candidates.length,
-    candidates,
-    tieredCounts,
-    creditsConsumed: 0,
-    headlineReason:
-      candidates.length === 0
-        ? 'Apollo returned no candidates for this domain + persona filter.'
-        : `${candidates.length} candidates (${tieredCounts.recommended} Recommended / ${tieredCounts.maybe} Maybe / ${tieredCounts.hold} Hold).`,
-  };
+  return { ...res.value, fromCache: res.fromCache, cachedAt: res.cachedAt, ageHours: res.ageHours };
 }
 
-export async function apolloEnrich({ candidateIds, approvingAm }) {
+export async function apolloEnrich({ candidateIds, approvingAm, refresh = false }) {
   if (!candidateIds || candidateIds.length === 0) {
-    return { status: 'no_data', enriched: [], creditsConsumed: 0 };
+    return { status: 'no_data', enriched: [], creditsConsumed: 0, servedFromCache: 0 };
   }
   const enriched = [];
   let creditsConsumed = 0;
+  let servedFromCache = 0;
   for (const id of candidateIds) {
     try {
-      const data = await apolloFetch('/v1/people/match', { id });
-      const p = data?.person;
-      if (p) {
-        enriched.push(normalizePerson(p, []));
-        creditsConsumed += 1;
+      // Read-through 24h cache: re-enriching the same person serves the cached record at 0 credits
+      // (review P1b — fixes the silent double-charge on follow-ups). Only a found person is cached.
+      const res = await cached(
+        enrichKey(id),
+        TTL.apolloEnrich,
+        async () => {
+          const data = await apolloFetch('/v1/people/match', { id });
+          const p = data?.person;
+          return p ? normalizePerson(p, []) : null;
+        },
+        { refresh, shouldCache: (v) => v != null },
+      );
+      if (res.value) {
+        enriched.push({ ...res.value, cached: res.fromCache });
+        if (res.fromCache) servedFromCache += 1;
+        else creditsConsumed += 1;
       }
     } catch (error) {
       enriched.push({ apolloPersonId: id, status: 'failed', error: error.message });
@@ -164,8 +192,9 @@ export async function apolloEnrich({ candidateIds, approvingAm }) {
     status: enriched.length === 0 ? 'failed' : 'ok',
     enriched,
     creditsConsumed,
+    servedFromCache,
     approvingAm,
-    headlineReason: `Enriched ${creditsConsumed} of ${candidateIds.length} candidate(s).`,
+    headlineReason: `Enriched ${creditsConsumed} of ${candidateIds.length} candidate(s)${servedFromCache ? `, ${servedFromCache} from cache (0 credits)` : ''}.`,
   };
 }
 

@@ -1,0 +1,332 @@
+{
+  "version": "1.0",
+  "_doc": "Per-tool interpretation-card rendering. worker/render.mjs reads this file and stamps each in-scope tool result with an `interpretation` block; the 'How to render tool results' INSTRUCTIONS tell the model to render that block as a 4-line card (Ran/Found/Means/Source) plus, for contact tools, two separate groups. Change rendering by editing this file alone — no code change. Token syntax in templates: {field} pulled from the stamped vars (NOT raw result paths); the stamper in render.mjs computes every var from the real provider result fields.",
+
+  "card": {
+    "lines": ["ran", "found", "means", "source"],
+    "lineLabels": { "ran": "Ran", "found": "Found", "means": "Means", "source": "Source" }
+  },
+
+  "badges": {
+    "FS":  { "label": "Freshsales", "long": "Freshsales (CRM · read-only)",            "note": "Mordor Intelligence's own CRM. Read-only — never written to." },
+    "AP":  { "label": "Apollo",     "long": "Apollo (net-new sourcing)",                "note": "Search is free; enrich + verify cost credits." },
+    "CO":  { "label": "Clearout",   "long": "Clearout (email verification)",            "note": "Deliverability verdict; gates the verified-only send queue." },
+    "DAY": { "label": "Day AI",     "long": "Day AI (system of record · write)",        "note": "The only place writes land. Idempotent." }
+  },
+
+  "confidenceCues": {
+    "high": "●●● high",
+    "med":  "●●○ med",
+    "low":  "●○○ low"
+  },
+
+  "cacheNote": "served from cache (0 credits)",
+  "stalenessTemplate": "refreshed {ageHours}h ago",
+  "freshTemplate": "just refreshed",
+  "staleHours": 24,
+  "staleSuffix": " — add refresh:true to re-pull",
+  "costApprovalNote": "needs cost approval — nothing spent yet",
+
+  "groups": {
+    "freshsales": {
+      "key": "freshsales",
+      "title": "Existing MI contacts",
+      "subtitle": "Mordor Intelligence's Freshsales CRM — people we already know",
+      "order": 1,
+      "badge": "FS",
+      "sourceTool": "freshsales_evidence",
+      "sourceField": "contacts",
+      "rowTemplate": "[FS] {name} — {title} · {owner}{touchNote}",
+      "touchTemplate": " · ⚠ contacted {when}",
+      "touchMaxDays": 30,
+      "emptyState": "No existing MI contacts in Freshsales for this domain."
+    },
+    "apollo": {
+      "key": "apollo",
+      "title": "Net-new (Apollo)",
+      "subtitle": "Apollo prospects, not yet in MI's CRM",
+      "order": 2,
+      "badge": "AP",
+      "sourceTool": "apollo_search",
+      "sourceField": "candidates",
+      "tierGlyphs": { "Recommended": "★ Recommended", "Maybe": "Maybe", "Hold": "Hold" },
+      "showTiers": ["Recommended", "Maybe"],
+      "tierRank": { "Recommended": 0, "Maybe": 1, "Hold": 2 },
+      "rowTemplate": "[AP] {tierGlyph} — {name} — {title}",
+      "emptyState": "Apollo returned no net-new candidates for this domain + persona filter."
+    }
+  },
+
+  "tools": {
+    "freshsales_evidence": {
+      "badge": "FS",
+      "label": "Freshsales",
+      "role": "CRM · read-only",
+      "roleNote": "Mordor Intelligence's CRM. Never written to. Authoritative for prior touches and duplicate risk.",
+      "found": {
+        "ok": "{accountsCount} account(s), {contactsCount} contact(s), {dealsCount} deal(s) · duplicate risk {duplicateRisk}.",
+        "no_data": "Nothing on file for this domain.",
+        "failed": "CRM unreachable — duplicate check incomplete."
+      },
+      "meaning": {
+        "ok": "MI already knows this account: {accountsCount} account(s), {contactsCount} contact(s), {dealsCount} deal(s). Duplicate risk {duplicateRisk} — reuse the existing relationship; don't create a fresh org.",
+        "no_data": "No existing MI record for this domain — safe to treat as net-new, no duplicate-org risk.",
+        "failed": "Freshsales was unreachable, so we can't rule out an existing MI account. Do NOT create a new org yet (could duplicate)."
+      },
+      "contactFields": ["name", "title", "owner", "email", "lastActivity"],
+      "rendersGroup": "freshsales",
+      "confidence": {
+        "rules": [
+          { "when": "status", "equals": "failed", "level": "low" },
+          { "when": "status", "equals": "no_data", "level": "med" },
+          { "when": "duplicateRisk", "in": ["low"], "level": "high" },
+          { "when": "duplicateRisk", "in": ["medium", "high"], "level": "med" },
+          { "when": "duplicateRisk", "in": ["unknown", "none"], "level": "med" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "exact-domain CRM match — trust the owner/touch history",
+          "med": "multiple CRM accounts on this domain (or nothing on file) — disambiguate before acting",
+          "low": "unreachable — don't rely on this to skip a dup check"
+        }
+      },
+      "verdictGlyphs": {
+        "duplicateRisk": { "none": "—", "low": "✅", "medium": "⚠️", "high": "⛔", "unknown": "❓" }
+      }
+    },
+
+    "apollo_search": {
+      "badge": "AP",
+      "label": "Apollo",
+      "role": "net-new sourcing · search (0 credits)",
+      "roleNote": "Free metadata search. Emails are masked until apollo_enrich. Tiers are provisional until verified.",
+      "found": {
+        "ok": "{candidateCount} candidate(s): {recommended} Recommended / {maybe} Maybe / {hold} Hold.",
+        "no_data": "0 candidates.",
+        "failed": "Search failed — no credits spent."
+      },
+      "meaning": {
+        "ok": "{candidateCount} net-new prospects, tiered {recommended} Recommended / {maybe} Maybe / {hold} Hold. These cost 0 credits to find — pick who to enrich + verify next.",
+        "no_data": "Apollo found no decision-makers for this domain + persona filter. Try a different persona pack or widen the role buckets.",
+        "failed": "Apollo search failed — try again; no credits were spent."
+      },
+      "contactFields": ["tier", "name", "title", "seniority", "tierReason"],
+      "rendersGroup": "apollo",
+      "confidence": {
+        "rules": [
+          { "when": "status", "equals": "failed", "level": "low" },
+          { "when": "status", "equals": "no_data", "level": "low" },
+          { "when": "status", "equals": "ok", "level": "med" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "enriched + Clearout-verified",
+          "med": "search-tier only — confidence rises after enrich + Clearout",
+          "low": "no usable candidates"
+        }
+      }
+    },
+
+    "apollo_enrich": {
+      "badge": "AP",
+      "label": "Apollo",
+      "role": "enrichment · credit-metered",
+      "roleNote": "Unmasks email for AM-picked candidate IDs. 24h cache → re-enrich is 0 credits.",
+      "found": {
+        "ok": "{enrichedCount} email(s) revealed · {creditsConsumed} credit(s){servedFromCacheNote}.",
+        "no_data": "Nothing to enrich.",
+        "failed": "Enrich failed — emails stay masked."
+      },
+      "meaning": {
+        "ok": "Revealed {enrichedCount} email(s); spent {creditsConsumed} Apollo credit(s){servedFromCacheNote}. The unmasked emails are now ready for Clearout.",
+        "no_data": "No candidate IDs supplied — nothing to enrich.",
+        "failed": "Enrichment failed for the selected IDs; emails stay masked."
+      },
+      "contactFields": ["name", "title", "email", "emailStatus"],
+      "confidence": {
+        "rules": [
+          { "when": "status", "equals": "failed", "level": "low" },
+          { "when": "status", "equals": "no_data", "level": "low" },
+          { "when": "status", "equals": "ok", "level": "high" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "real address from Apollo — verify with Clearout before queueing",
+          "med": "served from cache — accurate but may be stale",
+          "low": "no address revealed"
+        }
+      }
+    },
+
+    "clearout_verify": {
+      "badge": "CO",
+      "label": "Clearout",
+      "role": "email verification · credit-metered",
+      "roleNote": "Deliverability gate. 30d cache → re-verify is 0 credits. Only a 'verified' verdict is queue-ready.",
+      "found": {
+        "ok": "{verified} verified, {risky} risky, {invalid} invalid · {creditsConsumed} credit(s){servedFromCacheNote}.",
+        "no_data": "Nothing to verify.",
+        "failed": "Verification failed."
+      },
+      "meaning": {
+        "ok": "{verified} address(es) safe to send, {risky} risky (hold for review), {invalid} cannot be sent. Only the {verified} verified one(s) can enter the send queue.",
+        "no_data": "No emails passed in — nothing to verify.",
+        "failed": "Clearout was unreachable; verdicts unknown — treat these as NOT queue-ready."
+      },
+      "contactFields": ["email", "status", "clearoutReason", "verifiedAt"],
+      "confidence": {
+        "field": "verdict",
+        "rules": [
+          { "when": "status", "equals": "failed", "level": "low" },
+          { "when": "verdict", "equals": "verified", "level": "high" },
+          { "when": "verdict", "equals": "risky", "level": "med" },
+          { "when": "verdict", "equals": "invalid", "level": "low" },
+          { "when": "verdict", "equals": "failed", "level": "low" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "verified — queue-ready",
+          "med": "risky — hold for review, don't auto-send",
+          "low": "invalid/failed — do not send"
+        }
+      },
+      "verdictGlyphs": {
+        "status":  { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" },
+        "verdict": { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" }
+      }
+    },
+
+    "dayai_write": {
+      "badge": "DAY",
+      "label": "Day AI",
+      "role": "system of record · write",
+      "roleNote": "The only place writes land. Idempotency-keyed → a retry reuses the key and never duplicates. Attributed to the signed-in AM.",
+      "found": {
+        "ok": "1 {type} written: {name}.",
+        "replayed": "1 {type} (replayed, not re-written): {name}.",
+        "failed": "0 written — pending sync."
+      },
+      "meaning": {
+        "ok": "Saved a {type} to Day AI ({name}) attributed to {approvingAm}. It's the system of record now{linkPhrase}. Idempotency key {idempotencyKey} — a retry reuses it, never duplicates.",
+        "replayed": "This {type} was already saved (idempotency replay) — no duplicate created. {name} is unchanged.",
+        "failed": "Write FAILED and is marked pending_sync. Nothing was saved. Retry with the SAME idempotency key ({idempotencyKey}); never a new one."
+      },
+      "contactFields": [],
+      "confidence": {
+        "rules": [
+          { "when": "ok", "equals": true, "level": "high" },
+          { "when": "ok", "equals": false, "level": "low" }
+        ],
+        "default": "low",
+        "cueNote": {
+          "high": "persisted in the system of record with a real record ID",
+          "low": "not persisted — pending retry"
+        }
+      },
+      "verdictGlyphs": {
+        "ok": { "true": "✅", "false": "❌" }
+      }
+    },
+
+    "build_receipt": {
+      "badge": "DAY",
+      "label": "Day AI",
+      "role": "account receipt · synthesis",
+      "roleNote": "Aggregates all four providers into one color-coded account receipt and writes it as a Day AI context page. Color is the worst provider status.",
+      "found": {
+        "green": "{headline}",
+        "yellow": "{headline}",
+        "red": "{headline}"
+      },
+      "meaning": {
+        "green": "Account is in good standing. {narrative} Next: {nextAction}",
+        "yellow": "Needs an AM decision before proceeding. {narrative} Next: {nextAction}",
+        "red": "Stop — something failed or is pending sync. {narrative} Next: {nextAction}"
+      },
+      "contactFields": ["name", "email", "emailVerdict", "decision"],
+      "confidence": {
+        "field": "color",
+        "rules": [
+          { "when": "color", "equals": "green", "level": "high" },
+          { "when": "color", "equals": "yellow", "level": "med" },
+          { "when": "color", "equals": "red", "level": "low" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "all providers healthy",
+          "med": "a duplicate-risk or no-data flag to clear",
+          "low": "a failure or pending sync blocks this account"
+        }
+      },
+      "verdictGlyphs": {
+        "color": { "green": "🟢", "yellow": "🟡", "red": "🔴" }
+      }
+    },
+
+    "work_contact": {
+      "badge": "CO",
+      "label": "Clearout",
+      "role": "per-contact outreach loop · read + synthesis",
+      "roleNote": "Discovers+verifies the email (Apollo+Clearout) and stages a non-salesy draft + LinkedIn note. Sends nothing, writes nothing until you approve.",
+      "found": {
+        "needsCostApproval": "Cost gate: {projectedApollo} Apollo + {projectedClearout} Clearout — nothing spent.",
+        "ready": "{emailAddress} — {emailVerdict} · {creditsApollo} Apollo + {creditsClearout} Clearout credit(s).",
+        "noEmail": "No deliverable email — held for review."
+      },
+      "meaning": {
+        "needsCostApproval": "{message}",
+        "ready": "{contactName}: email {emailVerdict} {emailGlyph}; draft + LinkedIn note staged. {queueNote}{recentTouchNote}",
+        "noEmail": "{contactName}: no deliverable email ({emailReason}) — held for review, draft not queue-ready."
+      },
+      "contactFields": ["contactName", "contactTitle", "emailAddress", "emailVerdict", "recentTouch"],
+      "confidence": {
+        "field": "verdict",
+        "rules": [
+          { "when": "needsCostApproval", "equals": true, "level": "med" },
+          { "when": "verdict", "equals": "verified", "level": "high" },
+          { "when": "verdict", "equals": "risky", "level": "med" },
+          { "when": "verdict", "equals": "invalid", "level": "low" },
+          { "when": "verdict", "equals": "failed", "level": "low" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "verified email — queue-ready on approval",
+          "med": "risky email (or cost gate) — held / awaiting approval",
+          "low": "invalid/no email — not sendable"
+        }
+      },
+      "verdictGlyphs": {
+        "verdict": { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" }
+      }
+    },
+
+    "work_contacts": {
+      "badge": "CO",
+      "label": "Clearout",
+      "role": "bulk outreach loop · aggregate spend gate",
+      "roleNote": "Runs a slate through the per-contact loop under one aggregate cost-approval gate. Sends nothing, writes nothing.",
+      "found": {
+        "needsCostApproval": "{total} contact(s) — up to {projectedApollo} Apollo + {projectedClearout} Clearout — nothing spent.",
+        "ready": "{total} worked · {verifiedCount} queue-ready, {heldCount} held · {creditsApollo} Apollo + {creditsClearout} Clearout."
+      },
+      "meaning": {
+        "needsCostApproval": "{message}",
+        "ready": "Worked {total} contact(s): {verifiedCount} verified and queue-ready, {heldCount} held for review. Spent {creditsApollo} Apollo + {creditsClearout} Clearout credit(s)."
+      },
+      "contactFields": ["contactName", "emailVerdict", "recentTouch"],
+      "rendersStackOf": "work_contact",
+      "confidence": {
+        "rules": [
+          { "when": "needsCostApproval", "equals": true, "level": "med" },
+          { "when": "ok", "equals": true, "level": "med" }
+        ],
+        "default": "med",
+        "cueNote": {
+          "high": "all worked contacts verified",
+          "med": "mixed verdicts (or cost gate) — review before queueing",
+          "low": "nothing queue-ready"
+        }
+      }
+    }
+  }
+}

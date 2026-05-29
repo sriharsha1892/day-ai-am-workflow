@@ -22,7 +22,9 @@ export async function recordUsage(amEmail, provider, count) {
   }
 }
 
-async function remaining(provider) {
+// Exported for the pre-spend gate (outreach.mjs). Apollo's balance isn't exposed by the API, so
+// only Clearout returns a number; Apollo returns null (spend tracked, runway not computable).
+export async function remainingCredits(provider) {
   try {
     if (provider === 'clearout') {
       // Lazy import avoids a static credits<->clearout cycle (clearout records usage here).
@@ -56,13 +58,13 @@ export async function myCredits(amEmail) {
   const [apolloUsed, clearoutUsed, clearoutRemaining] = await Promise.all([
     kv.get(usageKey(amEmail, 'apollo', ym)).then((v) => v ?? 0),
     kv.get(usageKey(amEmail, 'clearout', ym)).then((v) => v ?? 0),
-    remaining('clearout'),
+    remainingCredits('clearout'),
   ]);
   return {
     ok: true,
     amEmail,
     month: ym,
-    apollo: { usedThisMonth: apolloUsed },
+    apollo: { usedThisMonth: apolloUsed, remaining: null, note: 'Apollo balance not exposed by API — spend tracked, runway n/a' },
     clearout: { usedThisMonth: clearoutUsed, remaining: clearoutRemaining },
   };
 }
@@ -80,7 +82,7 @@ export async function teamCredits() {
     clearoutTotal += c;
     if (a || c) perAm.push({ amEmail: am, apollo: a, clearout: c });
   }
-  const clearoutRemaining = await remaining('clearout');
+  const clearoutRemaining = await remainingCredits('clearout');
   return {
     ok: true,
     month: ym,

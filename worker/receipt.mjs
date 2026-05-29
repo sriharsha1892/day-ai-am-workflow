@@ -9,6 +9,7 @@ import {
 import { apolloPeopleSearch } from './providers/apollo.mjs';
 import { writeDayAiContextPage } from './providers/day-ai.mjs';
 import { getIdempotencyForAccount, pendingForAccount } from './store.mjs';
+import { getOutreachProgress, summarize as summarizeProgress } from './progress.mjs';
 
 const COLOR_RANK = { green: 0, yellow: 1, red: 2 };
 
@@ -21,11 +22,13 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
     safe(() => apolloPeopleSearch({ canonicalDomain })),
   ]);
 
-  // 2. Pull idempotency-store records for this account (proves Day AI writes happened).
-  const [accountRecords, pendingSync] = await Promise.all([
+  // 2. Pull idempotency-store records + per-account outreach progress (real enrich/verify state).
+  const [accountRecords, pendingSync, progress] = await Promise.all([
     getIdempotencyForAccount(canonicalDomain),
     pendingForAccount(canonicalDomain),
+    getOutreachProgress(canonicalDomain).catch(() => null),
   ]);
+  const outreach = summarizeProgress(progress);
 
   // 3. Build provider blocks.
   const freshsalesBlock = freshsales
@@ -44,31 +47,37 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
         headlineReason: 'Freshsales unreachable from worker.',
       };
 
+  // Real enrich state from the outreach progress record (review P2b): no longer hardcoded.
+  const enrichmentStatus = outreach.contactsWorked > 0 ? 'complete' : 'not_requested';
   const apolloBlock = apollo
     ? {
         status: apollo.status,
         candidateCount: apollo.candidateCount,
         tieredCounts: apollo.tieredCounts,
-        enrichmentStatus: 'not_requested',
-        creditsConsumed: apollo.creditsConsumed ?? 0,
+        enrichmentStatus,
+        creditsConsumed: (apollo.creditsConsumed ?? 0) + outreach.creditsApollo,
         headlineReason: apollo.headlineReason,
       }
     : {
         status: 'failed',
         candidateCount: 0,
         tieredCounts: { recommended: 0, maybe: 0, hold: 0 },
-        enrichmentStatus: 'not_requested',
-        creditsConsumed: 0,
+        enrichmentStatus,
+        creditsConsumed: outreach.creditsApollo,
         headlineReason: 'Apollo unreachable from worker.',
       };
 
+  // Real Clearout verify state from the progress record (review P2b): no longer hardcoded not_run/0.
   const clearoutBlock = {
-    status: 'not_run',
-    verified: 0,
-    risky: 0,
-    invalid: 0,
-    creditsConsumed: 0,
-    headlineReason: 'Clearout not run yet for this account.',
+    status: outreach.contactsWorked > 0 ? 'ok' : 'not_run',
+    verified: outreach.verified,
+    risky: outreach.risky,
+    invalid: outreach.invalid,
+    creditsConsumed: outreach.creditsClearout,
+    headlineReason:
+      outreach.contactsWorked > 0
+        ? `${outreach.verified} verified, ${outreach.risky} risky, ${outreach.invalid} invalid across ${outreach.contactsWorked} worked contact(s).`
+        : 'Clearout not run yet for this account.',
   };
 
   const dayAiBlock = {
@@ -138,7 +147,15 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
       clearout: clearoutBlock,
       dayAi: dayAiBlock,
     },
-    contacts: [],
+    contacts: progress?.contacts
+      ? Object.values(progress.contacts).map((c) => ({
+          name: c.name,
+          email: c.email,
+          emailVerdict: c.emailVerdict,
+          decision: c.emailVerdict === 'verified' ? 'queued' : 'hold-for-review',
+          workedAt: c.workedAt,
+        }))
+      : [],
     approvedBy: approvingAm ?? 'unknown@ask-myra.ai',
     approvals: accountRecords.map((r) => ({
       action: r.type,

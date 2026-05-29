@@ -35,7 +35,9 @@ import { teamBrief, assignmentHealth, rolloutStatus } from './insights.mjs';
 import { prepareLinkedinTouch } from './providers/linkedin.mjs';
 import { composeFirstTouch } from './compose.mjs';
 import { getPreferences, setPreferences } from './preferences.mjs';
-import { runWorkContactLoop, checkRecentTouch } from './outreach.mjs';
+import { runWorkContactLoop, runWorkContactsBulk, checkRecentTouch } from './outreach.mjs';
+import { recordContactWorked } from './progress.mjs';
+import { interpret } from './render.mjs';
 import { myCredits, teamCredits } from './credits.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
@@ -62,7 +64,8 @@ You are the guided execution surface for a myRA Account Manager. Day AI is the s
 ## How to work
 - The AM talks to you in plain language ("research Michelman", "find contacts", "build a cadence", "what's saved?"). Map intent to the right tools and prompts.
 - Account identity is DOMAIN-FIRST. Always resolve identity (resolve_identity) before any Day AI Organization write.
-- Present receipts as a 3-4 sentence plain-English narrative followed by four color-coded bullets (Freshsales / Apollo / Clearout / Day AI). Default coaching = decision + one-line reason; expand full evidence only on Yellow/Red or when the AM asks "show details".
+- Every in-scope tool response carries an interpretation block stamped from the tool-rendering resource (myra://config/tool-rendering). Render that block; do not improvise prose about what a result means. See "How to render tool results".
+- build_receipt is the only ACCOUNT-LEVEL receipt: a 3-4 sentence narrative (summary.narrative) + four color bullets from summary.headlineReasonByProvider (Freshsales / Apollo / Clearout / Day AI) + summary.nextAction. Default coaching = decision + one-line reason; expand provider blocks only on Yellow/Red (summary.color) or when the AM asks "show details".
 
 ## Non-negotiables
 - Day AI is canonical for account state, contacts, tasks, drafts, ledger, health.
@@ -70,6 +73,16 @@ You are the guided execution surface for a myRA Account Manager. Day AI is the s
 - Every Day AI write carries an idempotency key and is attributed to the signed-in AM (approvedBy). Retries reuse the same key — never create duplicates.
 - AM approval is required before: canonical contact creation, external sends, lifecycle changes after intake.
 - If a tool fails, show a Red receipt with the exact failure and offer retry or abandon. Never silently retry with a new key.
+
+## How to render tool results
+Every in-scope tool result is stamped with an interpretation block (interpretation.{ran,found,means,source,confidence,glyph,groups}) derived from myra://config/tool-rendering. Render that block — never your own gloss of the raw JSON. Render EVERY such result as the same 4-line card:
+  Ran    — interpretation.ran     (the tool + its role, e.g. "Freshsales (CRM · read-only)")
+  Found  — interpretation.found   (the counts/summary)
+  Means  — interpretation.means   (plain-English: what this means for the AM's next move)
+  Source — interpretation.source  ([badge] + confidence cue + any cache/cost/staleness flag)
+Badges: FS Freshsales · AP Apollo · CO Clearout · DAY Day AI. Use interpretation.confidence as stamped (high/med/low) — do not recompute. If interpretation.glyph is present, show it inline on the verdict.
+The Source line already encodes cache state ("served from cache (0 credits)"), staleness ("refreshed Xh ago", with "add refresh:true to re-pull" once stale), and "needs cost approval — nothing spent yet". Echo those cues; never invent your own. On needsCostApproval, STOP and relay the projected cost; only after the AM approves re-call with confirmSpend:true.
+When interpretation.groups is present, render each group under its own heading, in order: "Existing MI contacts" (Freshsales — people Mordor Intelligence already knows) ABOVE "Net-new (Apollo)" (prospects not yet in MI's CRM). Print each group's rows[] verbatim; NEVER merge the two groups. Show emptyState when a group is empty. The Freshsales row shows "⚠ contacted <relative date>" only when there is a real recent sales touch (a field edit is never a contact). Apollo rows lead "★ Recommended" then "Maybe"; skip Hold unless the AM asks. Present Recommended as a pre-approved batch by name; walk Maybe one at a time.
 
 ## Contact selection (map_contacts / source_new_contacts)
 Present Recommended candidates as a pre-approved batch by name (AM can veto any by name), walk Maybe one at a time, skip Hold unless the AM asks. Numbered selection ("select 1, 3, 7") works at any prompt.
@@ -84,7 +97,11 @@ On a fresh session, call next_resume to find the AM's highest-priority unfinishe
 "What are my accounts?" → call list_my_accounts (the AM's central assignment list; the xlsx is retired). guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health, team_brief, rollout_status, team_credits.
 
 ## Per-contact outreach (work-contact)
-For "work this contact" / "work the next one": call work_contact. It runs email discovery+verification (Apollo+Clearout) and the LinkedIn note prep in parallel, then composes a NON-SALESY, designation-aware first touch (goal: earn ~15 min for a call, never pitch). Show ONE card: email + verdict glyph; the LinkedIn note + profile URL ("copy, open, send" — you send it manually, LinkedIn is never automated); the draft. Warn if recentTouch is set. Then STOP for approve/edit/skip. On approval only: dayai_write draft-create + action-create channel:linkedin. Before spending Apollo/Clearout credits, surface the cost (credits tool). "Work all the Recommended" → run work_contact per selected contact and present one stacked review list with approve-all / veto-by-name.
+For "work this contact" / "work the next one": call work_contact. It runs email discovery+verification (Apollo+Clearout) and the LinkedIn note prep in parallel, then composes a NON-SALESY, designation-aware first touch (goal: earn ~15 min for a call, never pitch). Repeat touches are cheap — enriched emails (24h) and Clearout verdicts (30d) are cached, so a re-run can cost 0 credits; pass refresh:true only to force a fresh pull.
+SPEND IS GATED SERVER-SIDE: if a call would push Clearout below its floor, work_contact returns needsCostApproval:true and spends NOTHING — relay the projected cost, and only after the AM approves re-call with confirmSpend:true. Do not try to bypass the gate.
+QUEUE IS VERIFIED-ONLY: only a Clearout-verified email is queueReady; risky/unknown/invalid are held for review (queueHold says why) — never queue them to send.
+Show ONE card: email + verdict glyph (✅ verified / ⚠️ risky / ❌ invalid); the LinkedIn note + profile URL ("copy, open, send" — manual, never automated); the draft. Warn if recentTouch is set (you already worked them, a teammate did, or CRM activity). Then STOP for approve/edit/skip. On approval only: dayai_write draft-create + action-create channel:linkedin — pass contactKey (the email or apolloPersonId) so two contacts on the same account the same day don't collide into one write.
+"Work all the Recommended" → call work_contacts (plural) with the slate. It returns ONE aggregate cost-approval card first; re-call with confirmSpend:true to proceed, then present the stacked review list with approve-all / veto-by-name.
 
 ## Preferences
 Honor the AM's saved preferences (get_my_preferences) — signature, default tone — in every draft; offer set_my_preferences when they express a standing choice ("always sign me as…").
@@ -118,10 +135,25 @@ function dayAiTokenFrom(extra) {
   return extra?.authInfo?.extra?.dayAiRefreshToken;
 }
 
-function ok(result) {
+// Stamp an interpretation block onto in-scope results so rendering doesn't depend on the model
+// remembering prose. Best-effort: a render/config error must NEVER fail the underlying tool call.
+// `ok:false` bodies are skipped (a soft-failed result must not get a "high confidence" card); a
+// receipt object has no `ok` field so it stamps normally.
+function stampInterpretation(toolName, result) {
+  if (!result || typeof result !== 'object' || result.ok === false) return result;
+  try {
+    const interpretation = interpret(toolName, result);
+    return interpretation ? { ...result, interpretation } : result;
+  } catch {
+    return result;
+  }
+}
+
+function ok(result, toolName) {
+  const body = toolName ? stampInterpretation(toolName, result) : result;
   return {
-    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    structuredContent: result,
+    content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+    structuredContent: body,
   };
 }
 
@@ -134,12 +166,30 @@ function fail(message, extra = {}) {
   };
 }
 
+// Contact-scoped actions need a per-CONTACT default key, or two contacts on the same account the
+// same day collide and the second write is silently dropped as a "replay" (review P1d). Account-
+// scoped actions keep the domain+day key. Callers may always pass an explicit idempotencyKey.
+const CONTACT_SCOPED_ACTIONS = new Set(['draft-create', 'action-create', 'person-create', 'person-dedupe-check']);
+export function defaultIdempotencyKey(args) {
+  const day = new Date().toISOString().slice(0, 10);
+  const disc = args.contactKey ?? args.payload?.contactEmail ?? args.payload?.email ?? args.payload?.apolloPersonId ?? null;
+  if (CONTACT_SCOPED_ACTIONS.has(args.action) && disc) {
+    const slug = String(disc).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return `${args.action}.${args.canonicalDomain}.${slug}.${day}`;
+  }
+  return `${args.action}.${args.canonicalDomain}.${day}`;
+}
+
 const CONFIG_FILES = {
   'myra-context': 'workflow/config/myra-context.json',
   packs: 'workflow/config/packs.json',
   'ux-guidance': 'workflow/config/ux-guidance.json',
   'org-resolution': 'workflow/config/org-resolution.json',
   'contact-sourcing': 'workflow/config/contact-sourcing.json',
+  // The rendering contract: per-tool badge/label/role/meaning/contactFields/confidence/glyphs.
+  // The worker stamps each in-scope tool response's `interpretation` block from this file; the
+  // "How to render tool results" instructions tell the model to render it. Swap rendering = edit JSON.
+  'tool-rendering': 'workflow/config/tool-rendering.json',
 };
 
 export function initializeServer(server) {
@@ -181,12 +231,13 @@ export function initializeServer(server) {
         accountName: z.string().optional(),
         aliases: z.array(z.string()).optional(),
         maxRecords: z.number().optional(),
+        refresh: z.boolean().optional(),
       },
     },
     async (args, extra) => {
       try {
         const result = await fetchFreshsalesEvidence(args);
-        return ok({ ...result, approvedBy: amEmailFrom(extra) });
+        return ok({ ...result, approvedBy: amEmailFrom(extra) }, 'freshsales_evidence');
       } catch (e) {
         return fail(`freshsales_evidence failed: ${e.message}`);
       }
@@ -204,12 +255,13 @@ export function initializeServer(server) {
         targetRoleBuckets: z.array(z.string()).optional(),
         titleKeywords: z.array(z.string()).optional(),
         limit: z.number().optional(),
+        refresh: z.boolean().optional(),
       },
     },
     async (args, extra) => {
       try {
         const result = await apolloPeopleSearch(args);
-        return ok({ ...result, approvedBy: amEmailFrom(extra) });
+        return ok({ ...result, approvedBy: amEmailFrom(extra) }, 'apollo_search');
       } catch (e) {
         return fail(`apollo_search failed: ${e.message}`);
       }
@@ -223,12 +275,13 @@ export function initializeServer(server) {
         'Selective Apollo enrichment for AM-selected candidate IDs only. Consumes Apollo credits — only call after the AM picks candidates and approves the spend.',
       inputSchema: {
         candidateIds: z.array(z.string()),
+        refresh: z.boolean().optional(),
       },
     },
     async (args, extra) => {
       try {
         const result = await apolloEnrich({ ...args, approvingAm: amEmailFrom(extra) });
-        return ok(result);
+        return ok(result, 'apollo_enrich');
       } catch (e) {
         return fail(`apollo_enrich failed: ${e.message}`);
       }
@@ -243,12 +296,13 @@ export function initializeServer(server) {
       inputSchema: {
         emails: z.array(z.string()),
         reason: z.string().optional(),
+        refresh: z.boolean().optional(),
       },
     },
     async (args, extra) => {
       try {
         const result = await clearoutVerify({ ...args, approvingAm: amEmailFrom(extra) });
-        return ok(result);
+        return ok(result, 'clearout_verify');
       } catch (e) {
         return fail(`clearout_verify failed: ${e.message}`);
       }
@@ -273,15 +327,14 @@ export function initializeServer(server) {
         ]),
         canonicalDomain: z.string(),
         idempotencyKey: z.string().optional(),
+        contactKey: z.string().optional(),
         retry: z.boolean().optional(),
         payload: z.record(z.any()).optional(),
       },
     },
     async (args, extra) => {
       const approvingAm = amEmailFrom(extra);
-      const idempotencyKey =
-        args.idempotencyKey ??
-        `${args.action}.${args.canonicalDomain}.${new Date().toISOString().slice(0, 10)}`;
+      const idempotencyKey = args.idempotencyKey ?? defaultIdempotencyKey(args);
       try {
         const result = await dayAiWrite({
           action: args.action,
@@ -292,7 +345,7 @@ export function initializeServer(server) {
           dayAiToken: dayAiTokenFrom(extra),
           ...(args.payload ?? {}),
         });
-        return ok(result);
+        return ok(result, 'dayai_write');
       } catch (e) {
         return fail(`dayai_write ${args.action} failed: ${e.message}`, {
           runStatus: 'pending_sync',
@@ -317,7 +370,7 @@ export function initializeServer(server) {
     async (args, extra) => {
       try {
         const result = await buildReceipt({ ...args, approvingAm: amEmailFrom(extra) });
-        return ok(result);
+        return ok(result, 'build_receipt');
       } catch (e) {
         return fail(`build_receipt failed: ${e.message}`);
       }
@@ -584,17 +637,85 @@ export function initializeServer(server) {
         knownEmail: z.string().optional(),
         personaPack: z.string().optional(),
         accountAngle: z.string().optional(),
+        confirmSpend: z.boolean().optional(),
+        refresh: z.boolean().optional(),
       },
     },
     async (args, extra) => {
       const amEmail = amEmailFrom(extra);
       try {
         const preferences = await getPreferences(amEmail).catch(() => ({}));
-        const recentTouch = await checkRecentTouch({ canonicalDomain: args.canonicalDomain, contactEmail: args.knownEmail });
-        const result = await runWorkContactLoop({ amEmail, canonicalDomain: args.canonicalDomain, contact: args, preferences, recentTouch });
-        return ok(result);
+        const contact = { ...args, name: args.contactName };
+        const recentTouch = await checkRecentTouch({ canonicalDomain: args.canonicalDomain, contactEmail: args.knownEmail, contactName: args.contactName, apolloPersonId: args.apolloPersonId });
+        const result = await runWorkContactLoop({ amEmail, canonicalDomain: args.canonicalDomain, contact, preferences, recentTouch, confirmSpend: args.confirmSpend, refresh: args.refresh });
+        // Record progress + make the account visible to next_resume — but only when we actually
+        // worked the contact (not when we stopped for a cost-approval card).
+        if (result.ok && !result.needsCostApproval) {
+          await recordContactWorked(args.canonicalDomain, {
+            contactId: args.apolloPersonId || result.email?.address || args.contactName,
+            name: args.contactName,
+            email: result.email?.address ?? null,
+            emailVerdict: result.email?.verdict ?? null,
+            creditsApollo: result.credits?.apollo ?? 0,
+            creditsClearout: result.credits?.clearout ?? 0,
+          }).catch(() => {});
+          await markStation(amEmail, { canonicalDomain: args.canonicalDomain, station: 'work_contact', status: 'in_progress' }).catch(() => {});
+        }
+        return ok(result, 'work_contact');
       } catch (e) {
         return fail(`work_contact failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'work_contacts',
+    {
+      description:
+        'Bulk version of work_contact: run a slate of contacts through the per-contact loop under bounded concurrency, with an AGGREGATE pre-spend approval gate. Returns a stacked review list. Sends NOTHING and writes NOTHING. First call returns a cost-approval card; re-call with confirmSpend:true to proceed.',
+      inputSchema: {
+        canonicalDomain: z.string(),
+        contacts: z.array(
+          z.object({
+            contactName: z.string().optional(),
+            title: z.string().optional(),
+            seniority: z.string().optional(),
+            department: z.string().optional(),
+            roleBucket: z.string().optional(),
+            apolloPersonId: z.string().optional(),
+            linkedinUrl: z.string().optional(),
+            knownEmail: z.string().optional(),
+            personaPack: z.string().optional(),
+            accountAngle: z.string().optional(),
+          }),
+        ),
+        confirmSpend: z.boolean().optional(),
+        refresh: z.boolean().optional(),
+      },
+    },
+    async (args, extra) => {
+      const amEmail = amEmailFrom(extra);
+      try {
+        const preferences = await getPreferences(amEmail).catch(() => ({}));
+        const contacts = (args.contacts ?? []).map((c) => ({ ...c, name: c.contactName }));
+        const result = await runWorkContactsBulk({ amEmail, canonicalDomain: args.canonicalDomain, contacts, preferences, confirmSpend: args.confirmSpend, refresh: args.refresh });
+        if (result.ok && !result.needsCostApproval) {
+          for (const r of result.results ?? []) {
+            if (!r || r.needsCostApproval) continue;
+            await recordContactWorked(args.canonicalDomain, {
+              contactId: r.contact?.apolloPersonId || r.email?.address || r.contact?.name,
+              name: r.contact?.name,
+              email: r.email?.address ?? null,
+              emailVerdict: r.email?.verdict ?? null,
+              creditsApollo: r.credits?.apollo ?? 0,
+              creditsClearout: r.credits?.clearout ?? 0,
+            }).catch(() => {});
+          }
+          await markStation(amEmail, { canonicalDomain: args.canonicalDomain, station: 'work_contact', status: 'in_progress' }).catch(() => {});
+        }
+        return ok(result, 'work_contacts');
+      } catch (e) {
+        return fail(`work_contacts failed: ${e.message}`);
       }
     },
   );
@@ -836,8 +957,10 @@ export function initializeServer(server) {
    • LinkedIn (I send manually): the connection note ("247/300 ✓") + profile URL — "copy the note, open the profile, send the request."
    • Draft email: subject + body, and which persona frame + angle it used.
    • If work_contact flags recentTouch, warn me up front ("⚠ emailed 12 days ago").
+   • If work_contact returns needsCostApproval, tell me the projected credits and ask me to approve BEFORE spending — then re-call with confirmSpend:true. Nothing was spent yet.
+   • Only a verified email is queue-ready; if it's risky/unknown/invalid, flag it as held-for-review, not ready to send.
 3. STOP and ask: "Approve, edit, or skip?"
-4. Only after I approve: dayai_write {action:'draft-create'} for the email (draft only — never send), dayai_write {action:'action-create', channel:'linkedin'} with the note as a manual task, and person-create first if I want the contact saved. If I skip, write nothing.
+4. Only after I approve: dayai_write {action:'draft-create'} for the email (draft only — never send), dayai_write {action:'action-create', channel:'linkedin'} with the note as a manual task, and person-create first if I want the contact saved. Pass contactKey (the email or apolloPersonId) on each so contacts on the same account/day don't collide. If I skip, write nothing.
 End with the one phrase to continue ("Say 'work the next one'").`,
           },
         },

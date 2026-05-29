@@ -1,5 +1,9 @@
-// Clearout provider. Batch email verification on AM-selected emails only.
+// Clearout provider. Email verification on AM-selected emails only.
 // Auth: Bearer fallback to raw token (mirrors scripts/clearout-probe.mjs).
+// Verdicts are cached 30d (worker/cache.mjs) so re-verifying the same address is free and the
+// system can answer "verified when?"; verification runs with bounded concurrency, not serially.
+
+import { cached, clearoutKey, TTL } from '../cache.mjs';
 
 function baseUrl() {
   return (process.env.CLEAROUT_BASE_URL || 'https://api.clearout.io').replace(/\/+$/, '');
@@ -51,32 +55,42 @@ export async function probe() {
   return { ok: true, credits };
 }
 
-export async function clearoutVerify({ emails = [], approvingAm, reason }) {
+export async function clearoutVerify({ emails = [], approvingAm, reason, refresh = false, concurrency = 5 }) {
   if (emails.length === 0) {
-    return { status: 'no_data', verified: 0, risky: 0, invalid: 0, results: [], creditsConsumed: 0 };
+    return { status: 'no_data', verified: 0, risky: 0, invalid: 0, results: [], creditsConsumed: 0, servedFromCache: 0 };
   }
 
-  const results = [];
   let creditsConsumed = 0;
+  let servedFromCache = 0;
 
-  for (const email of emails) {
-    try {
-      const data = await clearoutFetch('/v2/email_verify/instant', {
-        method: 'POST',
-        body: JSON.stringify({ email, timeout: 15000 }),
-      });
-      const verdict = data?.data?.status ?? data?.status;
-      results.push({
-        email,
-        status: mapStatus(verdict),
-        clearoutReason: data?.data?.sub_status ?? null,
-        verifiedAt: new Date().toISOString(),
-      });
-      creditsConsumed += 1;
-    } catch (error) {
-      results.push({ email, status: 'failed', clearoutReason: error.message });
-    }
-  }
+  const verifyOne = async (email) => {
+    const res = await cached(
+      clearoutKey(email),
+      TTL.clearout,
+      async () => {
+        const data = await clearoutFetch('/v2/email_verify/instant', {
+          method: 'POST',
+          body: JSON.stringify({ email, timeout: 15000 }),
+        });
+        const verdict = data?.data?.status ?? data?.status;
+        return {
+          email,
+          status: mapStatus(verdict),
+          clearoutReason: data?.data?.sub_status ?? null,
+          verifiedAt: new Date().toISOString(),
+        };
+      },
+      // Never cache a transport failure — only real verdicts get the 30d TTL.
+      { refresh, shouldCache: (v) => v && v.status !== 'failed' },
+    ).catch((error) => ({ value: { email, status: 'failed', clearoutReason: error.message, verifiedAt: null }, fromCache: false, cachedAt: null }));
+
+    if (res.fromCache) servedFromCache += 1;
+    else if (res.value.status !== 'failed') creditsConsumed += 1;
+
+    return { ...res.value, verifiedAt: res.value.verifiedAt ?? res.cachedAt, cached: res.fromCache };
+  };
+
+  const results = await runPool(emails, concurrency, verifyOne);
 
   const verified = results.filter((r) => r.status === 'verified').length;
   const risky = results.filter((r) => r.status === 'risky').length;
@@ -94,11 +108,26 @@ export async function clearoutVerify({ emails = [], approvingAm, reason }) {
     risky,
     invalid,
     creditsConsumed,
+    servedFromCache,
     results,
     approvingAm,
     reason,
-    headlineReason: `${verified} verified, ${risky} risky, ${invalid} invalid (cost: ${creditsConsumed} credits).`,
+    headlineReason: `${verified} verified, ${risky} risky, ${invalid} invalid (cost: ${creditsConsumed} credit${creditsConsumed === 1 ? '' : 's'}${servedFromCache ? `, ${servedFromCache} from cache` : ''}).`,
   };
+}
+
+// Bounded concurrency so a large selection respects Clearout limits without a slow serial loop.
+async function runPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  const workers = Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, async () => {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await fn(items[idx], idx);
+    }
+  });
+  await Promise.all(workers);
+  return out;
 }
 
 function mapStatus(verdict) {

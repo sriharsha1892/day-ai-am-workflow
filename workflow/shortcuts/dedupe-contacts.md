@@ -47,6 +47,8 @@ npm run worker:dayai-write -- \
 
 The `person-dedupe-check` step returns per-candidate `dedupeConfidence`, `matchedDayAiPersonId?`, `freshsalesIds`, `evidenceTrail`, and a decision recommendation (`create_new | link_existing | skip_duplicate`). The AM approves each one.
 
+> **v1 scope (honest):** dedup matching in v1 is **Day-AI email-based** — `person-dedupe-check` searches Day AI `native_contact` by email. Freshsales account/contact evidence is surfaced alongside (via `freshsales_evidence`) for the AM to eyeball, but cross-Freshsales-ID matching is not yet wired into the automatic decision. Treat Freshsales IDs as advisory evidence, not an automatic merge key, until that lands.
+
 Every `person-create` write stamps the approving AM and an idempotency key derived from `canonical_domain + email + ISO date`. Retries reuse the same key — the worker rejects duplicate Person creation server-side.
 
 If the worker is unreachable, set `runStatus=blocked`, show Red receipt, do not write locally.

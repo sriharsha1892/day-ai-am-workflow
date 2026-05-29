@@ -44,7 +44,7 @@ if (dryRun) {
   process.exit(0);
 }
 
-const { assignAccounts, listAllAssignments } = await import('../worker/accounts.mjs');
+const { bulkSeed, listAllAssignments } = await import('../worker/accounts.mjs');
 
 const assignRows = rows.map((r) => ({
   amEmail: r.am_email,
@@ -59,10 +59,8 @@ const assignRows = rows.map((r) => ({
   notes: r.notes || undefined,
 }));
 
-const result = await assignAccounts('loader@ask-myra.ai', assignRows);
-console.log(`Assigned ${result.assigned} accounts.`);
-const reassigned = result.results.filter((r) => r.reassignedFrom);
-if (reassigned.length) console.log(`  (${reassigned.length} reassigned from a prior owner)`);
+const result = await bulkSeed(assignRows);
+console.log(`Seeded ${result.written} accounts (fast bulk path).`);
 
 if (prune) {
   // Remove any KV assignment whose accountId isn't in the CSV for that AM.

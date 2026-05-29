@@ -136,6 +136,51 @@ export async function assignAccounts(actorEmail, rows) {
   return { ok: true, assigned: results.length, results };
 }
 
+// Fast authoritative seed (loader). Skips the per-row single-owner scan that assignAccounts does
+// (unnecessary when the CSV is the source of truth) and writes concurrently in chunks — turns a
+// ~2000-call O(n²) seed into a few hundred calls in seconds. The validator already guarantees no
+// cross-AM duplicate domain, so single-owner holds.
+export async function bulkSeed(rows, { actorEmail = 'loader@ask-myra.ai', concurrency = 20 } = {}) {
+  const now = new Date().toISOString();
+  const rosterAdds = new Set();
+  let written = 0;
+  for (let i = 0; i < rows.length; i += concurrency) {
+    const chunk = rows.slice(i, i + concurrency);
+    await Promise.all(
+      chunk.map(async (row) => {
+        if (!row.amEmail || !row.accountName) return;
+        const accountId = accountIdFor(row);
+        const record = {
+          accountId,
+          accountName: row.accountName,
+          domain: row.domain ?? '',
+          canonicalDomain: canonicalDomain(row.domain) || '',
+          status: row.status ?? 'domain_pending',
+          priority: row.priority ?? '',
+          personaPack: row.personaPack ?? '',
+          cadencePack: row.cadencePack ?? '',
+          channelPack: row.channelPack ?? '',
+          notes: row.notes ?? '',
+          amEmail: row.amEmail,
+          amName: row.amName ?? '',
+          assignedBy: actorEmail,
+          assignedAt: now,
+          updatedAt: now,
+          reassignedFrom: null,
+        };
+        await Promise.all([
+          kv.set(k.rec(row.amEmail, accountId), record),
+          kv.sadd(k.index(row.amEmail), accountId),
+        ]);
+        rosterAdds.add(row.amEmail);
+        written += 1;
+      }),
+    );
+  }
+  await Promise.all([...rosterAdds].map((am) => kv.sadd(k.roster(), am)));
+  return { ok: true, written };
+}
+
 export async function unassignAccount(actorEmail, { amEmail, accountId }) {
   const rec = await kv.get(k.rec(amEmail, accountId));
   if (!rec) return { ok: false, reason: `No account ${accountId} for ${amEmail}` };

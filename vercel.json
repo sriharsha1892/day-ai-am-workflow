@@ -4,9 +4,14 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 60
+    },
+    "api/mcp.mjs": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
+    { "source": "/mcp", "destination": "/api/mcp" },
+    { "source": "/mcp/(.*)", "destination": "/api/mcp" },
     { "source": "/(.*)", "destination": "/api" }
   ]
 }

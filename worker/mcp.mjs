@@ -32,6 +32,10 @@ import {
   listAllAssignments,
 } from './accounts.mjs';
 import { teamBrief, assignmentHealth, rolloutStatus } from './insights.mjs';
+import { prepareLinkedinTouch } from './providers/linkedin.mjs';
+import { composeFirstTouch } from './compose.mjs';
+import { getPreferences, setPreferences } from './preferences.mjs';
+import { runWorkContactLoop, checkRecentTouch } from './outreach.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
 for (const candidate of ['worker/.env', '.env.local']) {
@@ -545,6 +549,128 @@ export function initializeServer(server) {
     },
   );
 
+  // ---- Per-contact outreach loop + preferences ----
+
+  server.registerTool(
+    'work_contact',
+    {
+      description:
+        "Satya's per-contact loop for ONE contact: in parallel discover+verify the email (Apollo+Clearout) and prepare a non-salesy LinkedIn connection note, then compose a designation-aware non-salesy first-touch draft. Returns a combined review card. Sends NOTHING and writes NOTHING — show the card, get approval, then call dayai_write.",
+      inputSchema: {
+        canonicalDomain: z.string(),
+        contactName: z.string().optional(),
+        title: z.string().optional(),
+        seniority: z.string().optional(),
+        department: z.string().optional(),
+        roleBucket: z.string().optional(),
+        apolloPersonId: z.string().optional(),
+        linkedinUrl: z.string().optional(),
+        knownEmail: z.string().optional(),
+        personaPack: z.string().optional(),
+        accountAngle: z.string().optional(),
+      },
+    },
+    async (args, extra) => {
+      const amEmail = amEmailFrom(extra);
+      try {
+        const preferences = await getPreferences(amEmail).catch(() => ({}));
+        const recentTouch = await checkRecentTouch({ canonicalDomain: args.canonicalDomain, contactEmail: args.knownEmail });
+        const result = await runWorkContactLoop({ amEmail, canonicalDomain: args.canonicalDomain, contact: args, preferences, recentTouch });
+        return ok(result);
+      } catch (e) {
+        return fail(`work_contact failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'prepare_linkedin_touch',
+    {
+      description: 'Assemble the manual LinkedIn handoff: profile URL + a short (≤300 char), non-salesy, designation-aware connection note. Makes no LinkedIn network call (manual by design).',
+      inputSchema: {
+        canonicalDomain: z.string(),
+        contactName: z.string().optional(),
+        title: z.string().optional(),
+        seniority: z.string().optional(),
+        department: z.string().optional(),
+        roleBucket: z.string().optional(),
+        linkedinUrl: z.string().optional(),
+        personaPack: z.string().optional(),
+        accountAngle: z.string().optional(),
+      },
+    },
+    async (args) => {
+      try {
+        return ok(prepareLinkedinTouch(args));
+      } catch (e) {
+        return fail(`prepare_linkedin_touch failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'compose_first_touch',
+    {
+      description: 'Compose a designation-aware, NON-SALESY first-touch email (subject+body) whose only goal is to earn ~15 minutes for a call. Returns toneChecks + queueReady (false if the email is invalid).',
+      inputSchema: {
+        canonicalDomain: z.string(),
+        contactName: z.string().optional(),
+        title: z.string(),
+        seniority: z.string().optional(),
+        roleBucket: z.string().optional(),
+        personaPack: z.string().optional(),
+        emailVerdict: z.enum(['verified', 'risky', 'invalid', 'unknown']).optional(),
+        accountAngle: z.string().optional(),
+        cta: z.string().optional(),
+        proofPoint: z.string().optional(),
+      },
+    },
+    async (args, extra) => {
+      try {
+        const preferences = await getPreferences(amEmailFrom(extra)).catch(() => ({}));
+        return ok(composeFirstTouch({ ...args, preferences }));
+      } catch (e) {
+        return fail(`compose_first_touch failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'get_my_preferences',
+    {
+      description: "The signed-in AM's saved preferences (signature, default tone, calendar link, default packs).",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      try {
+        return ok(await getPreferences(amEmailFrom(extra)));
+      } catch (e) {
+        return fail(`get_my_preferences failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'set_my_preferences',
+    {
+      description: "Save the AM's preferences once so drafts auto-use them ('always sign me as Satya, AM; default tone consultative').",
+      inputSchema: {
+        signature: z.string().optional(),
+        defaultTone: z.string().optional(),
+        calendarLink: z.string().optional(),
+        defaultPersonaPack: z.string().optional(),
+        defaultCadencePack: z.string().optional(),
+      },
+    },
+    async (args, extra) => {
+      try {
+        return ok(await setPreferences(amEmailFrom(extra), args));
+      } catch (e) {
+        return fail(`set_my_preferences failed: ${e.message}`);
+      }
+    },
+  );
+
   // ---- Resources (the behavioral config the playbook references) ----
   for (const [name, file] of Object.entries(CONFIG_FILES)) {
     server.registerResource(
@@ -630,6 +756,41 @@ export function initializeServer(server) {
           content: {
             type: 'text',
             text: `Show me the account health for ${domain}: call build_receipt and render the narrative + four color-coded provider bullets + next action.`,
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
+    'work-contact',
+    {
+      description: "Run the per-contact loop for one contact: parallel email discovery+verify + LinkedIn note, then a non-salesy draft, shown for review. Nothing sends.",
+      argsSchema: {
+        domain: z.string(),
+        contact: z.string().optional(),
+        apolloPersonId: z.string().optional(),
+        title: z.string().optional(),
+        linkedinUrl: z.string().optional(),
+      },
+    },
+    ({ domain, contact, apolloPersonId, title, linkedinUrl }) => ({
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: `Work this contact for ${domain}: ${contact ?? apolloPersonId ?? 'the one I just selected'}${title ? ` (${title})` : ''}.
+
+1. Call work_contact with the domain + contact details${linkedinUrl ? ` (linkedinUrl ${linkedinUrl})` : ''}. It runs email discovery+verification and the LinkedIn note prep in parallel, then composes a non-salesy first-touch draft.
+2. Show me ONE combined card:
+   • Email: address + Clearout verdict (✅ verified / ⚠️ risky / ❌ invalid) + credits used.
+   • LinkedIn (I send manually): the connection note ("247/300 ✓") + profile URL — "copy the note, open the profile, send the request."
+   • Draft email: subject + body, and which persona frame + angle it used.
+   • If work_contact flags recentTouch, warn me up front ("⚠ emailed 12 days ago").
+3. STOP and ask: "Approve, edit, or skip?"
+4. Only after I approve: dayai_write {action:'draft-create'} for the email (draft only — never send), dayai_write {action:'action-create', channel:'linkedin'} with the note as a manual task, and person-create first if I want the contact saved. If I skip, write nothing.
+End with the one phrase to continue ("Say 'work the next one'").`,
           },
         },
       ],

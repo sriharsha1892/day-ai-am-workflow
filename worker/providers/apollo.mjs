@@ -183,7 +183,7 @@ function normalizePerson(p, roleBuckets) {
   };
 }
 
-function matchRoleBucket(title, roleBuckets) {
+export function matchRoleBucket(title, roleBuckets) {
   const t = String(title).toLowerCase();
   for (const bucket of roleBuckets) {
     const tokens = bucket.toLowerCase().split(/[\s/]+/);

@@ -49,11 +49,9 @@ function sortAccounts(list) {
 
 export async function listMyAccounts(amEmail, { status } = {}) {
   const ids = await kv.smembers(k.index(amEmail));
-  const records = [];
-  for (const id of ids) {
-    const rec = await kv.get(k.rec(amEmail, id));
-    if (rec && (!status || rec.status === status)) records.push(rec);
-  }
+  // Batched (mget) instead of a serial kv.get per account — turns 1+N round-trips into 2.
+  const recs = await kv.mget(ids.map((id) => k.rec(amEmail, id)));
+  const records = recs.filter((rec) => rec && (!status || rec.status === status));
   return { ok: true, amEmail, count: records.length, accounts: sortAccounts(records) };
 }
 
@@ -61,15 +59,12 @@ export async function getAccount(amEmail, idOrDomain, { withTourState = true } =
   const id = canonicalDomain(idOrDomain) || slug(idOrDomain);
   let rec = await kv.get(k.rec(amEmail, id));
   if (!rec) {
-    // Fall back: maybe they passed a display name we slugged differently — scan the index.
+    // Fall back: maybe they passed a display name we slugged differently — scan the index (batched).
     const ids = await kv.smembers(k.index(amEmail));
-    for (const candidate of ids) {
-      const r = await kv.get(k.rec(amEmail, candidate));
-      if (r && (r.accountName?.toLowerCase() === String(idOrDomain).toLowerCase() || r.canonicalDomain === id)) {
-        rec = r;
-        break;
-      }
-    }
+    const recs = await kv.mget(ids.map((candidate) => k.rec(amEmail, candidate)));
+    rec = recs.find(
+      (r) => r && (r.accountName?.toLowerCase() === String(idOrDomain).toLowerCase() || r.canonicalDomain === id),
+    ) ?? rec;
   }
   if (!rec) return { ok: false, reason: `No account "${idOrDomain}" assigned to ${amEmail}` };
   let tourState = null;

@@ -12,6 +12,8 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { initializeServer, serverOptions } from '../worker/mcp.mjs';
 import { verifyAccessToken } from '../worker/oauth/broker.mjs';
 import { recordLastSeen } from '../worker/insights.mjs';
+import * as kv from '../worker/kv.mjs';
+import { amTokenKey } from '../worker/token-hash.mjs';
 
 export const config = { runtime: 'nodejs', maxDuration: 60 };
 
@@ -53,6 +55,16 @@ async function verifyToken(_req, bearerToken) {
     };
   }
 
+  // 2a. KV-backed static token (am-token:{sha256}) — lets `issue-am-token` add/rotate AMs with NO
+  // Vercel redeploy. Checked before the env map so new AMs go live instantly. KV-down → null → env map.
+  const kvEmail = await kv.get(amTokenKey(bearerToken)).catch(() => null);
+  if (kvEmail) {
+    void recordLastSeen(kvEmail);
+    return { token: bearerToken, clientId: kvEmail, scopes: ['myra:use'], extra: { amEmail: kvEmail } };
+  }
+
+  // 2b. Env-var map (WORKER_BEARER_TOKENS) — the original static path; kept as a fallback for the
+  // whole pilot so the seeded tokens never break even if KV is unavailable.
   const amEmail = parseTokenMap(process.env.WORKER_BEARER_TOKENS).get(bearerToken);
   if (amEmail) {
     void recordLastSeen(amEmail);

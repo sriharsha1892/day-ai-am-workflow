@@ -19,6 +19,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { applyEnv, loadLocalEnv, envPath } from './env-utils.mjs';
+import * as kv from '../worker/kv.mjs';
+import { amTokenKey } from '../worker/token-hash.mjs';
 
 applyEnv(loadLocalEnv(envPath));
 
@@ -36,15 +38,20 @@ if (!fs.existsSync(envFile)) {
   fail(`${envFile} not found. Create it first with WORKER_BEARER_TOKENS=<existing pairs>.`);
 }
 
-const updatedEnvLine = updateLocalEnv(envFile, amEmail, token);
-if (!skipVercel) {
-  pushToVercel(updatedEnvLine);
-}
+const priorToken = priorTokenFor(envFile, amEmail);
+updateLocalEnv(envFile, amEmail, token);
+
+// Activate/rotate the token in KV — instant, NO Vercel redeploy. (.env.local + the
+// WORKER_BEARER_TOKENS env var on Vercel remain as a fallback for the pilot.)
+await syncKv({ amEmail, token, priorToken, revoke });
+
 if (token) {
   persistTokenFile(amEmail, token);
 }
-if (redeploy) {
-  redeployProd();
+
+if (token && args.installer) {
+  const r = spawnSync('node', ['scripts/make-am-installer.mjs', '--am', amEmail], { stdio: 'inherit' });
+  if (r.status !== 0) process.stderr.write('installer generation failed (run `npm run am:installer -- --am <email>` manually)\n');
 }
 
 print(amEmail, token, revoke);
@@ -103,6 +110,34 @@ function persistTokenFile(email, t) {
   process.stdout.write(`OK local backup: ${tokenPath}\n`);
 }
 
+// Read the AM's existing token from .env.local so a rotation can delete the old KV key.
+function priorTokenFor(file, email) {
+  if (!fs.existsSync(file)) return null;
+  const line = fs.readFileSync(file, 'utf8').split(/\r?\n/).find((l) => l.startsWith('WORKER_BEARER_TOKENS='));
+  if (!line) return null;
+  for (const pair of line.slice('WORKER_BEARER_TOKENS='.length).split(',')) {
+    const idx = pair.indexOf(':');
+    if (idx !== -1 && pair.slice(0, idx).trim() === email) return pair.slice(idx + 1).trim() || null;
+  }
+  return null;
+}
+
+// am-token:{sha256} -> amEmail. Delete any prior token for this AM, then set the new one. No redeploy.
+async function syncKv({ amEmail, token, priorToken, revoke }) {
+  try {
+    if (priorToken) await kv.del(amTokenKey(priorToken));
+    if (!revoke && token) {
+      await kv.set(amTokenKey(token), amEmail);
+      process.stdout.write('OK activated in KV (live now — no redeploy).\n');
+    } else {
+      process.stdout.write('OK revoked in KV (no redeploy).\n');
+    }
+  } catch (e) {
+    process.stderr.write(`KV sync failed: ${e.message}\n`);
+    fail('Could not reach KV — ensure KV_REST_API_URL / KV_REST_API_TOKEN are in .env.local (run `vercel env pull`).');
+  }
+}
+
 function redeployProd() {
   process.stdout.write('Redeploying production so the new token map takes effect…\n');
   const result = spawnSync('vercel', ['--prod', '--yes'], { stdio: 'inherit' });
@@ -112,18 +147,15 @@ function redeployProd() {
 function print(email, t, isRevoke) {
   process.stdout.write('\n=================================\n');
   if (isRevoke) {
-    process.stdout.write(`Revoked ${email} from WORKER_BEARER_TOKENS.\n`);
-    process.stdout.write('Redeploy production for the change to take effect: vercel --prod --yes\n');
+    process.stdout.write(`Revoked ${email} (KV key deleted; live immediately, no redeploy).\n`);
     return;
   }
-  process.stdout.write(`Issued token for ${email}.\n\n`);
+  process.stdout.write(`Issued + activated token for ${email} — live now, no redeploy.\n\n`);
   process.stdout.write(`  Token: ${t}\n\n`);
   process.stdout.write('Next steps:\n');
-  process.stdout.write('  1. Send to the AM via 1Password Send or Bitwarden Send (one-time view).\n');
-  process.stdout.write('  2. Point them at docs/satya-handoff.md (or the AM-specific equivalent).\n');
-  if (!skipVercel) {
-    process.stdout.write('  3. Vercel env vars updated. Redeploy: vercel --prod --yes (or re-run with --redeploy)\n');
-  }
+  process.stdout.write(`  1. Build the one-click installer: npm run issue-am-token -- --am ${email} --installer\n`);
+  process.stdout.write('     (or hand the token to the AM via 1Password Send — one-time view).\n');
+  process.stdout.write('  2. Point them at docs/am-onboarding-windows.md.\n');
 }
 
 function parseArgs(argv) {

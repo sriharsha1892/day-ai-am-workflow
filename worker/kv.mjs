@@ -36,6 +36,10 @@ export async function smembers(setKey) {
 export async function srem(setKey, member) {
   return pick().srem(setKey, member);
 }
+// Batch get — one Upstash round-trip (mget) instead of N serial gets (used by listMyAccounts).
+export async function mget(keys) {
+  return pick().mget(keys);
+}
 
 function pick() {
   if (backend) return backend;
@@ -69,6 +73,11 @@ function redis(client) {
     },
     async srem(setKey, member) {
       await client.srem(setKey, member);
+    },
+    async mget(keys) {
+      if (!keys || keys.length === 0) return [];
+      const raw = await client.mget(...keys);
+      return raw.map((r) => (r == null ? null : typeof r === 'string' ? JSON.parse(r) : r));
     },
   };
 }
@@ -116,6 +125,9 @@ function disk() {
       const cur = (await this.get(setKey)) ?? [];
       const next = cur.filter((m) => m !== member);
       await this.set(setKey, next);
+    },
+    async mget(keys) {
+      return Promise.all((keys ?? []).map((k) => this.get(k)));
     },
   };
 }

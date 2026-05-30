@@ -43,6 +43,8 @@
     "worker:dayai-onboard": "node scripts/worker-dayai-onboard.mjs",
     "michelman:pilot": "node scripts/michelman-pilot.mjs",
     "issue-am-token": "node scripts/issue-am-token.mjs",
+    "seed:tokens": "node scripts/seed-tokens-to-kv.mjs",
+    "am:installer": "node scripts/make-am-installer.mjs",
     "accounts:validate": "node scripts/validate-master-account-list.mjs",
     "accounts:load": "node scripts/load-account-lists.mjs",
     "accounts:dump": "node scripts/dump-account-lists.mjs",

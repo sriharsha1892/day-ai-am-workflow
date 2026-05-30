@@ -96,21 +96,45 @@ export function decide(best, candidateCount) {
       receiptColor: 'green',
     };
   }
+  // High confidence can come from a Freshsales/Apollo exact-domain match with NO Day AI org. Only
+  // auto-LINK when a real Day AI Organization exists; otherwise CREATE it (root of the ITC bug:
+  // a Freshsales-only 0.99 match was told to link to a Day AI org that didn't exist → "no record ID").
+  const hasDayAiOrg = Boolean(best.dayAiOrganizationId);
   if (best.confidence >= 0.98) {
+    if (hasDayAiOrg) {
+      return {
+        action: 'auto_link_existing',
+        matchStatus: 'auto_link_existing',
+        matchConfidence: best.confidence,
+        matchedDayAiOrgId: best.dayAiOrganizationId,
+        headlineReason: POLICY.decisionPolicy.exactCanonicalDomain.receipt,
+        receiptColor: 'green',
+      };
+    }
     return {
-      action: 'auto_link_existing',
-      matchStatus: 'auto_link_existing',
+      action: 'create_org_from_evidence',
+      matchStatus: 'create_org_from_evidence',
       matchConfidence: best.confidence,
-      headlineReason: POLICY.decisionPolicy.exactCanonicalDomain.receipt,
+      headlineReason: `Strong match in ${best.evidence?.[0]?.source ?? 'CRM'} but not yet a Day AI Organization — create the Org, then proceed.`,
       receiptColor: 'green',
     };
   }
   if (best.confidence >= 0.9) {
+    if (hasDayAiOrg) {
+      return {
+        action: 'auto_link_existing_with_receipt',
+        matchStatus: 'auto_link_existing_with_receipt',
+        matchConfidence: best.confidence,
+        matchedDayAiOrgId: best.dayAiOrganizationId,
+        headlineReason: POLICY.decisionPolicy.clearTypoOrNameVariant.receipt,
+        receiptColor: 'green',
+      };
+    }
     return {
-      action: 'auto_link_existing_with_receipt',
-      matchStatus: 'auto_link_existing_with_receipt',
+      action: 'create_org_from_evidence',
+      matchStatus: 'create_org_from_evidence',
       matchConfidence: best.confidence,
-      headlineReason: POLICY.decisionPolicy.clearTypoOrNameVariant.receipt,
+      headlineReason: `Likely match in ${best.evidence?.[0]?.source ?? 'CRM'} but not yet a Day AI Organization — create the Org, then proceed.`,
       receiptColor: 'green',
     };
   }

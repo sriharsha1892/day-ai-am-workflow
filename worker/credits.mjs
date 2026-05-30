@@ -3,6 +3,7 @@
 // team-wide runway in plain words.
 
 import * as kv from './kv.mjs';
+import { peek as cachePeek, putEntry as cachePutEntry } from './cache.mjs';
 
 const usageKey = (am, provider, ym) => `credit-usage:${am}:${provider}:${ym}`;
 
@@ -27,10 +28,16 @@ export async function recordUsage(amEmail, provider, count) {
 export async function remainingCredits(provider) {
   try {
     if (provider === 'clearout') {
+      // 5-min cache — the pre-spend gate probes this PER contact (20s timeout); one live probe per
+      // 5 min is plenty for a balance, and a bulk run no longer pays N blocking getcredits calls.
+      const hit = await cachePeek('clearout:balance');
+      if (hit && typeof hit.value === 'number') return hit.value;
       // Lazy import avoids a static credits<->clearout cycle (clearout records usage here).
       const { probe } = await import('./providers/clearout.mjs');
       const p = await probe();
-      return typeof p.credits === 'number' ? p.credits : null;
+      const credits = typeof p.credits === 'number' ? p.credits : null;
+      if (credits != null) await cachePutEntry('clearout:balance', credits, 300);
+      return credits;
     }
     // Apollo's plan endpoint isn't exposed in the probe; remaining is unknown (return null, not 0).
     return null;

@@ -1,0 +1,67 @@
+$ErrorActionPreference = 'Stop'
+$token = '{{TOKEN}}'
+$url   = '{{URL}}'
+$email = '{{EMAIL}}'
+
+Write-Host ''
+Write-Host '==============================================='
+Write-Host '  Setting up myRA in Codex for {{NAME}}'
+Write-Host '==============================================='
+Write-Host ''
+
+# 1) Is Codex installed?
+$codex = Get-Command codex -ErrorAction SilentlyContinue
+if (-not $codex) {
+  Write-Host 'Codex is not installed yet.' -ForegroundColor Yellow
+  Write-Host 'Install it, then double-click this file again:'
+  Write-Host '   winget install OpenAI.Codex'
+  Write-Host '   (or, if you have Node:  npm install -g @openai/codex )'
+  Read-Host 'Press Enter to close'
+  exit 1
+}
+
+# 2) Write / merge the Codex config (token + Windows sandbox fix) -- backed up first.
+$dir = Join-Path $env:USERPROFILE '.codex'
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+$cfg = Join-Path $dir 'config.toml'
+$existing = ''
+if (Test-Path $cfg) {
+  Copy-Item $cfg "$cfg.bak" -Force
+  $existing = Get-Content $cfg -Raw
+  # remove any prior [mcp_servers.myra] block so re-runs don't duplicate it
+  $existing = [regex]::Replace($existing, '(?ms)^\[mcp_servers\.myra\].*?(?=^\[|\Z)', '')
+}
+# pre-empt the "couldn't set up admin sandbox" failure
+if ($existing -notmatch '(?m)^\[windows\]') {
+  $existing = "[windows]`r`nsandbox = `"unelevated`"`r`n`r`n" + $existing
+} elseif ($existing -match 'sandbox\s*=\s*"elevated"') {
+  $existing = $existing -replace 'sandbox\s*=\s*"elevated"', 'sandbox = "unelevated"'
+}
+$block = "[mcp_servers.myra]`r`nurl = `"$url/mcp`"`r`nhttp_headers = { Authorization = `"Bearer $token`" }`r`n"
+$out = (($existing.TrimEnd()) + "`r`n`r`n" + $block).TrimStart()
+Set-Content -Path $cfg -Value $out -Encoding UTF8
+Write-Host 'Config written; Windows sandbox set to unelevated.' -ForegroundColor Green
+
+# 3) Verify directly against the worker (proves token + config BEFORE you open Codex).
+try {
+  $h = @{ Authorization = "Bearer $token"; 'content-type' = 'application/json'; 'accept' = 'application/json, text/event-stream' }
+  $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"installer","version":"1"}}}'
+  Invoke-RestMethod -Uri "$url/mcp" -Method Post -Headers $h -Body $init | Out-Null
+  $call = '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_my_accounts","arguments":{}}}'
+  $resp = Invoke-RestMethod -Uri "$url/mcp" -Method Post -Headers $h -Body $call
+  $text = [string]$resp.result.content[0].text
+  $m = [regex]::Match($text, '"count":(\d+)')
+  if ($m.Success) {
+    Write-Host ('  Connected -- you have ' + $m.Groups[1].Value + ' accounts.') -ForegroundColor Green
+  } else {
+    Write-Host '  Connected (could not read the account count, that is fine).' -ForegroundColor Yellow
+  }
+} catch {
+  Write-Host ('  Could not reach the myRA worker: ' + $_.Exception.Message) -ForegroundColor Yellow
+  Write-Host '  Your config is saved; open Codex and try anyway, or tell the admin.'
+}
+
+Write-Host ''
+Write-Host 'Done!  Open Codex (restart it if it is already open) and type:' -ForegroundColor Cyan
+Write-Host '   what are my accounts?'
+Read-Host 'Press Enter to close'

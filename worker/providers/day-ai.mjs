@@ -167,60 +167,70 @@ export async function fetchDayAiOrgsByName(normalizedName) {
 
 // ----- Writes -----
 
-// Action verb -> { toolName, buildArgs(payload) }. Each handler shapes our
-// internal payload into the exact arguments Day AI's MCP tool expects.
-const WRITE_HANDLERS = {
+const orgLink = (domain) => (domain ? `${baseUrl()}/organizations/${domain}` : null);
+
+// Best-effort id dig across the shapes a Day AI write tool may return in content[0].text.
+function idFromResponse(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null;
+  return (
+    parsed.objectId ?? parsed.id ?? parsed.draftId ?? parsed.actionId ?? parsed.contextId ??
+    parsed.organization?.objectId ?? parsed.person?.objectId ?? parsed.opportunity?.objectId ??
+    parsed.action?.objectId ?? parsed.draft?.objectId ?? parsed.context?.objectId ??
+    parsed.record?.objectId ?? parsed.record?.id ?? null
+  );
+}
+
+// Action verb -> { tool, args(payload), type, extractRecord }. args() shapes our internal payload
+// into the EXACT arguments the live Day AI MCP tool expects (verified against day-ai-sdk SCHEMA.md
+// + live tools/list, 2026-05-29): every create_or_update_* write takes its properties under
+// `standardProperties`, NOT at the top level. Day AI orgs are domain-keyed (the canonical domain IS
+// the organization objectId), so org writes/links don't need the response to echo an id.
+export const WRITE_HANDLERS = {
   'org-link': {
     tool: null,
-    // Day AI doesn't have an explicit "link org" tool; linking is implicit when
-    // we pass `domain` to opportunity-create. So org-link is a no-op that just
-    // returns the existing org IDs we already found.
+    // Orgs are domain-keyed; "linking" = the org exists at this domain. resolve_identity only routes
+    // here when a Day AI org already exists (otherwise create_org_from_evidence -> org-create).
     async run({ canonicalDomain, matchedDayAiOrgId }) {
-      return {
-        record: {
-          id: matchedDayAiOrgId ?? null,
-          name: canonicalDomain,
-          link: matchedDayAiOrgId ? `${baseUrl()}/organizations/${matchedDayAiOrgId}` : null,
-        },
-        type: 'organization',
-      };
+      const id = matchedDayAiOrgId ?? canonicalDomain ?? null;
+      return { record: { id, name: canonicalDomain, link: orgLink(id) }, type: 'organization' };
     },
   },
   'org-create': {
     tool: 'create_or_update_person_organization',
     args: (p) => ({
+      isCreating: true,
       objectType: 'Organization',
-      domain: p.canonicalDomain,
-      name: p.accountName ?? p.canonicalDomain,
+      objectId: p.canonicalDomain,
+      standardProperties: { domain: p.canonicalDomain, name: p.accountName ?? p.canonicalDomain },
     }),
     type: 'organization',
-    extractRecord: (parsed, p) => {
-      const r = parsed?.organization ?? parsed?.record ?? parsed;
-      return {
-        id: r?.objectId ?? r?.id,
-        name: r?.title ?? r?.name ?? p.accountName ?? p.canonicalDomain,
-        link: r?.objectId ? `${baseUrl()}/organizations/${r.objectId}` : null,
-      };
-    },
+    // objectId is deterministically the domain — the write response need not echo it.
+    extractRecord: (parsed, p) => ({
+      id: p.canonicalDomain,
+      name: p.accountName ?? parsed?.title ?? p.canonicalDomain,
+      link: orgLink(p.canonicalDomain),
+    }),
   },
   'opportunity-create': {
     tool: 'create_or_update_opportunity',
     args: (p) => ({
       isCreating: true,
-      title: p.title ?? `${p.canonicalDomain} - Researching`,
-      domain: p.canonicalDomain,
-      stageId: p.stageId,
-      ownerEmail: p.ownerEmail ?? p.approvingAm,
-      expectedRevenue: p.expectedRevenue,
-      expectedCloseDate: p.expectedCloseDate,
+      standardProperties: {
+        title: p.title ?? `${p.canonicalDomain} - Researching`,
+        stageId: p.stageId,
+        domain: p.canonicalDomain,
+        ownerEmail: p.ownerEmail ?? p.approvingAm,
+        expectedRevenue: p.expectedRevenue,
+        expectedCloseDate: p.expectedCloseDate,
+      },
     }),
     type: 'opportunity',
     extractRecord: (parsed, p) => {
-      const r = parsed?.opportunity ?? parsed?.record ?? parsed;
+      const id = idFromResponse(parsed);
       return {
-        id: r?.objectId ?? r?.id,
-        name: r?.title ?? p.title,
-        link: r?.objectId ? `${baseUrl()}/opportunities/${r.objectId}` : null,
+        id: id ?? `opp:${p.canonicalDomain}`,
+        name: parsed?.title ?? p.title ?? `${p.canonicalDomain} opportunity`,
+        link: id ? `${baseUrl()}/opportunities/${id}` : null,
       };
     },
   },
@@ -229,23 +239,27 @@ const WRITE_HANDLERS = {
     args: (p) => {
       const candidate = p.candidate ?? p;
       return {
+        isCreating: true,
         objectType: 'Person',
-        email: candidate.email,
-        firstName: candidate.firstName ?? candidate.name?.split(' ')[0],
-        lastName: candidate.lastName ?? candidate.name?.split(' ').slice(1).join(' '),
-        jobTitle: candidate.title ?? candidate.jobTitle,
-        linkedInUrl: candidate.linkedinUrl ?? candidate.linkedInUrl,
-        phoneNumbers: candidate.phone ? [candidate.phone] : undefined,
+        standardProperties: {
+          email: candidate.email,
+          firstName: candidate.firstName ?? candidate.name?.split(' ')[0],
+          lastName: candidate.lastName ?? candidate.name?.split(' ').slice(1).join(' '),
+          jobTitle: candidate.title ?? candidate.jobTitle,
+          linkedInUrl: candidate.linkedinUrl ?? candidate.linkedInUrl,
+          phoneNumbers: candidate.phone ? [candidate.phone] : undefined,
+        },
       };
     },
     type: 'person',
     extractRecord: (parsed, p) => {
-      const r = parsed?.person ?? parsed?.record ?? parsed;
-      const email = p.candidate?.email ?? p.email;
+      const candidate = p.candidate ?? p;
+      const id = idFromResponse(parsed);
+      const email = candidate.email;
       return {
-        id: r?.objectId ?? email,
-        name: r?.title ?? (`${p.candidate?.firstName ?? ''} ${p.candidate?.lastName ?? ''}`.trim() || email),
-        link: r?.objectId ? `${baseUrl()}/people/${r.objectId}` : null,
+        id: id ?? email,
+        name: parsed?.title ?? (`${candidate.firstName ?? ''} ${candidate.lastName ?? ''}`.trim() || candidate.name || email),
+        link: id ? `${baseUrl()}/people/${id}` : null,
       };
     },
   },
@@ -271,57 +285,66 @@ const WRITE_HANDLERS = {
   },
   'action-create': {
     tool: 'create_or_update_action',
+    // Live schema: ownerEmail / dueDate / people[] / domains[] / assignedToAssistant — NOT
+    // assigneeEmail / dueAt / relatedContactEmail / relatedOpportunityDomain / channel.
     args: (p) => ({
       title: p.summary ?? p.title ?? 'Follow-up',
-      description: p.description ?? p.summary,
-      dueAt: p.dueAt,
-      assigneeEmail: p.assigneeEmail ?? p.approvingAm,
-      relatedContactEmail: p.contactEmail,
-      relatedOpportunityDomain: p.canonicalDomain,
-      channel: p.channel,
+      assignedToAssistant: false,
+      ownerEmail: p.assigneeEmail ?? p.ownerEmail ?? p.approvingAm,
+      description: p.description ?? p.summary ?? (p.channel ? `Channel: ${p.channel}` : undefined),
+      dueDate: p.dueAt ?? p.dueDate,
+      people: p.contactEmail ? [p.contactEmail] : undefined,
+      domains: p.canonicalDomain ? [p.canonicalDomain] : undefined,
     }),
     type: 'action',
     extractRecord: (parsed, p) => {
-      const r = parsed?.action ?? parsed?.record ?? parsed;
+      const id = idFromResponse(parsed);
       return {
-        id: r?.objectId ?? r?.id,
-        name: r?.title ?? p.summary,
-        link: r?.objectId ? `${baseUrl()}/actions/${r.objectId}` : null,
+        id: id ?? `action:${p.canonicalDomain}:${String(p.contactEmail ?? p.summary ?? '').slice(0, 40)}`,
+        name: parsed?.title ?? p.summary ?? p.title ?? 'Action',
+        link: id ? `${baseUrl()}/actions/${id}` : null,
       };
     },
   },
   'draft-create': {
     tool: 'create_email_draft',
+    // Live schema: `description` is REQUIRED; `to` is an ARRAY; no relatedOpportunityDomain field.
     args: (p) => ({
-      to: p.contactEmail ?? p.to,
+      description: p.description ?? (p.subject ? `First-touch: ${p.subject}` : 'First-touch outreach draft'),
+      to: p.contactEmail ? [p.contactEmail] : Array.isArray(p.to) ? p.to : p.to ? [p.to] : undefined,
       subject: p.subject,
       body: p.bodyHtml ?? p.body,
-      relatedOpportunityDomain: p.canonicalDomain,
     }),
     type: 'draft',
     extractRecord: (parsed, p) => {
-      const r = parsed?.draft ?? parsed?.record ?? parsed;
+      const id = idFromResponse(parsed);
       return {
-        id: r?.objectId ?? r?.id,
-        name: r?.title ?? p.subject,
-        link: r?.objectId ? `${baseUrl()}/drafts/${r.objectId}` : null,
+        id: id ?? `draft:${p.canonicalDomain}:${String(p.contactEmail ?? p.subject ?? '').slice(0, 40)}`,
+        name: parsed?.title ?? p.subject ?? 'Draft',
+        link: id ? `${baseUrl()}/drafts/${id}` : null,
       };
     },
   },
   'review-context': {
     tool: 'create_or_update_workspace_context',
+    // Live schema: mode + plainTextValue required; attach to the org via objectType+objectId
+    // (NOT title/content/relatedOrganizationDomain).
     args: (p) => ({
+      mode: 'create',
+      plainTextValue: p.reason ?? p.bodyMarkdown ?? p.content ?? '',
       title: p.summary ?? p.title ?? 'Review required',
-      content: p.reason ?? p.bodyMarkdown ?? '',
-      relatedOrganizationDomain: p.canonicalDomain,
+      summary: p.summary ?? p.title,
+      attachmentType: 'object',
+      objectType: 'native_organization',
+      objectId: p.canonicalDomain,
     }),
     type: 'page',
     extractRecord: (parsed, p) => {
-      const r = parsed?.context ?? parsed?.record ?? parsed;
+      const id = idFromResponse(parsed);
       return {
-        id: r?.objectId ?? `review-${p.canonicalDomain}-${Date.now()}`,
-        name: r?.title ?? p.summary ?? 'Review context',
-        link: r?.objectId ? `${baseUrl()}/contexts/${r.objectId}` : null,
+        id: id ?? `review-${p.canonicalDomain}-${Date.now()}`,
+        name: parsed?.title ?? p.summary ?? 'Review context',
+        link: id ? `${baseUrl()}/contexts/${id}` : null,
       };
     },
   },
@@ -357,6 +380,12 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
     // dayAiToken (the signed-in AM's refresh token) attributes the write to that AM;
     // undefined falls back to the shared integration token.
     const result = await mcpCallTool(handler.tool, handler.args(payload), dayAiToken);
+    // Day AI can return a tool-level error (result.isError) WITHOUT a JSON-RPC error — mcpCallTool
+    // lets that through, so guard here or extractRecord fabricates success on a failed write.
+    if (result?.isError) {
+      const msg = result.content?.[0]?.text ?? 'Day AI tool reported isError';
+      throw new Error(`Day AI ${handler.tool} error: ${String(msg).slice(0, 300)}`);
+    }
     const parsed = parseMcpResult(result);
     record = handler.extractRecord(parsed, payload);
     type = handler.type;
@@ -384,15 +413,21 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
 export async function writeDayAiContextPage({ canonicalDomain, organizationId, title, bodyMarkdown, approvingAm }) {
   if (!credsReady()) throw new Error('Day AI credentials missing');
   const result = await mcpCallTool('create_or_update_workspace_context', {
+    mode: 'create',
+    plainTextValue: bodyMarkdown,
     title,
-    content: bodyMarkdown,
-    relatedOrganizationDomain: canonicalDomain,
-    relatedOrganizationId: organizationId,
+    summary: title,
+    attachmentType: 'object',
+    objectType: 'native_organization',
+    objectId: organizationId ?? canonicalDomain,
   });
+  if (result?.isError) {
+    throw new Error(`Day AI create_or_update_workspace_context error: ${String(result.content?.[0]?.text ?? '').slice(0, 200)}`);
+  }
   const parsed = parseMcpResult(result);
-  const r = parsed?.context ?? parsed?.record ?? parsed;
+  const id = idFromResponse(parsed) ?? null;
   return {
-    pageId: r?.objectId ?? null,
-    link: r?.objectId ? `${baseUrl()}/contexts/${r.objectId}` : null,
+    pageId: id,
+    link: id ? `${baseUrl()}/contexts/${id}` : null,
   };
 }

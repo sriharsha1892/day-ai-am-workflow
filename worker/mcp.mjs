@@ -23,6 +23,7 @@ import {
   setTourState,
   markStation,
   nextResume,
+  listTourDomains,
 } from './state.mjs';
 import {
   listMyAccounts,
@@ -36,7 +37,7 @@ import { prepareLinkedinTouch } from './providers/linkedin.mjs';
 import { composeFirstTouch } from './compose.mjs';
 import { getPreferences, setPreferences } from './preferences.mjs';
 import { runWorkContactLoop, runWorkContactsBulk, checkRecentTouch } from './outreach.mjs';
-import { recordContactWorked } from './progress.mjs';
+import { recordContactWorked, getOutreachProgress, summarize } from './progress.mjs';
 import { interpret } from './render.mjs';
 import { myCredits, teamCredits } from './credits.mjs';
 import { queuePendingSync, allPending, drainPendingByKey } from './store.mjs';
@@ -95,7 +96,7 @@ Present Recommended candidates as a pre-approved batch by name (AM can veto any 
 Resolve the persona/cadence/channel packs, then walk each step's fields in sequence (channel? timing? tone? CTA?), accept "keep" for defaults, render a numbered preview, then write Actions + Drafts on approval.
 
 ## Cross-session
-On the FIRST message of a session, greet the AM by name, call next_resume, and offer their top unfinished account naming what was last done ("Hi Satish — last on ITC Friday: 3 contacts approved. Resume, or start fresh?"). On "bye"/"wrap up"/"done for today", give a brief wrap-up: accounts touched, contacts worked, drafts queued, credits used this month, any pending sync, and the resume suggestion.
+On the FIRST message of a session, greet the AM by name and call next_resume. If it returns a resume, offer that account, naming what was last done from resume.lastDoneSummary and resume.lastTouchedAt as a RELATIVE date ("Hi Satish — last on ITC 3 days ago: 4 contacts worked, 2 verified. Resume, or start fresh?"). NEVER invent counts — if lastDoneSummary is absent, just name the account. If next_resume returns resume:null AND list_my_accounts is empty, this is a brand-new AM: warmly say they're connected with no accounts yet and offer to assign one ("You're all set up — no accounts assigned yet. Say 'assign Acme to me', or run /guided-tour.") — do NOT dump an empty table. On "bye"/"wrap up"/"done for today", call end_session and relay its digest verbatim (accounts touched, contacts worked + verified, credit runway, any pending sync, and the resume suggestion).
 
 ## Account list
 "What are my accounts?" → call list_my_accounts. Render as a COMPACT aligned table (priority · status · account · domain), in the returned order. Map filter intents to args: "my P1s" → priority:'P1'; "ready to intake" → status:'ready_for_intake'; "untouched 7+ days" → untouchedDays:7; "alphabetical" → sort:'name'. (The xlsx is retired.) guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health (blockers carry a nextStep), team_brief, rollout_status, team_credits. set_admin_thresholds tunes overload/stale/low-runway thresholds (no redeploy). For stuck Day AI writes ("fix Day AI" / "retry sync" / "what's stuck"): show_pending_syncs, then retry_all_pending (reuses each idempotency key — never duplicates). If any credits/work result carries a lowBalanceAlert, surface that banner verbatim.
@@ -940,6 +941,46 @@ export function initializeServer(server) {
         return ok({ ok: true, thresholds: await setThresholds(args), updatedBy: amEmailFrom(extra) });
       } catch (e) {
         return fail(`set_admin_thresholds failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'end_session',
+    {
+      description:
+        "Read-only end-of-day digest for the signed-in AM: accounts touched, contacts worked + verified, Clearout credit runway this month, pending Day AI syncs, and the resume suggestion for next time. Call on 'bye' / 'done for today' / 'wrap up'.",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      try {
+        const am = amEmailFrom(extra);
+        const [credits, pendingAll, resume, domains] = await Promise.all([
+          myCredits(am).catch(() => null),
+          allPending().catch(() => []),
+          nextResume(am).catch(() => ({ resume: null })),
+          listTourDomains(am).catch(() => []),
+        ]);
+        const pending = pendingAll.filter((e) => !e.amEmail || e.amEmail === am);
+        let contactsWorked = 0;
+        let verified = 0;
+        for (const d of domains) {
+          const s = summarize(await getOutreachProgress(d));
+          contactsWorked += s.contactsWorked;
+          verified += s.verified;
+        }
+        return ok({
+          ok: true,
+          accountsTouched: domains.length,
+          contactsWorked,
+          verified,
+          credits,
+          pendingCount: pending.length,
+          pending,
+          resume: resume?.resume ?? null,
+        });
+      } catch (e) {
+        return fail(`end_session failed: ${e.message}`);
       }
     },
   );

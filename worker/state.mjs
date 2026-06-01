@@ -15,6 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Redis } from '@upstash/redis';
+import { getOutreachProgress, summarize } from './progress.mjs';
 
 const TTL_SECONDS = 90 * 86_400;
 const STATUS_PRIORITY = {
@@ -148,6 +149,8 @@ export async function nextResume(amEmail) {
     return new Date(b.lastTouchedAt ?? 0) - new Date(a.lastTouchedAt ?? 0);
   });
   const chosen = eligible[0];
+  // Truthful greet: real counts from this account's outreach progress (never invented by the model).
+  const done = summarize(await getOutreachProgress(chosen.account.canonicalDomain));
   return {
     ok: true,
     resume: {
@@ -156,6 +159,13 @@ export async function nextResume(amEmail) {
       runStatus: chosen.runStatus,
       nextActionHint: chosen.lastReceipt?.nextAction ?? null,
       lastReceiptColor: chosen.lastReceipt?.color ?? null,
+      lastTouchedAt: chosen.lastTouchedAt ?? null,
+      lastDoneSummary: {
+        contactsWorked: done.contactsWorked,
+        verified: done.verified,
+        risky: done.risky,
+        invalid: done.invalid,
+      },
     },
   };
 }

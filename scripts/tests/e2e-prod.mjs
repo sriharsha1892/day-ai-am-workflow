@@ -159,7 +159,7 @@ async function main() {
     await send('notifications/initialized', {}, true);
   }
 
-  // 5. tools/list → 31 tools (count + a few expected names).
+  // 5. tools/list → 31 tools today; 32 after the Increment-4 deploy adds end_session (bump on deploy).
   {
     const r = await send('tools/list', {});
     const tools = r.json?.result?.tools ?? [];

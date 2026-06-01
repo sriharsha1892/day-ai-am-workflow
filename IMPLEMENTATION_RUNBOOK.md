@@ -10,7 +10,7 @@ Each AM should configure their own Codex clone:
 
 ```bash
 npm install
-npm run doctor:codex   # setup:codex deprecated — onboard via the hosted worker (one-click installer)
+npm run doctor:codex   # setup:codex deprecated — onboard via the manual config snippet (docs/am-onboarding-manual.md)
 npm run doctor:codex
 ```
 

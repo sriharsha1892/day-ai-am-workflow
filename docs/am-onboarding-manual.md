@@ -1,7 +1,7 @@
 # myRA — manual setup (no installer)
 
-Use this when the one-click `.cmd` is blocked by antivirus/firewall. It runs **no program** — you
-just paste two small blocks into a settings file. ~3 minutes.
+Setup is a quick copy-paste — it runs **no program** (so antivirus/firewall can't block it). You
+paste two small blocks into a settings file. ~3 minutes.
 
 ## What you need
 - **Codex** installed.
@@ -26,10 +26,10 @@ can do steps 1–4 with you on a quick screenshare.
 ---
 
 ## For the admin
-Generate a per-AM snippet (no `.cmd`, embeds the token):
+Generate a per-AM snippet (embeds the token):
 
 ```bash
-node scripts/make-am-installer.mjs --am kirandeep@ask-myra.ai --manual
+node scripts/make-am-config.mjs --am kirandeep@ask-myra.ai
 # → .tokens/myra-config-<name>.toml   (SECRET — share via 1Password Send)
 ```
 
@@ -47,7 +47,6 @@ http_headers = { Authorization = "Bearer <that AM's token>" }
 Share the `.toml` (or just paste its contents) over a secure channel. Rotate anytime with
 `npm run issue-am-token -- --am <email>` (then re-run with `--manual`).
 
-> Manual setup runs no executable, so it sidesteps AV/SmartScreen blocking the `.cmd`. **Note:** the
-> machine's firewall must still allow Codex to reach `myra-am-worker.vercel.app` over HTTPS — if the
-> firewall blocks that host itself (not just the `.cmd`), the connection needs the domain allow-listed
-> regardless of setup method.
+> Setup runs no executable, so AV/SmartScreen can't block it. **Note:** the machine's firewall must
+> still allow Codex to reach `myra-am-worker.vercel.app` over HTTPS — if the firewall blocks that host
+> itself, the connection needs the domain allow-listed regardless of setup method.

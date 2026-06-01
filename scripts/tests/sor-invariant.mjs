@@ -1,8 +1,8 @@
 // Converts the "Day AI is system of record by default" policy into a regression GATE: no script may
 // re-introduce a direct day-ai MCP server (the path that bypasses the worker's idempotency /
 // approvedBy / pending-sync safeguards), and the doctor must verify the worker is present and a
-// direct day-ai server is absent. Complements config-merge.mjs (which proves the installer comments
-// any legacy block out).
+// direct day-ai server is absent. (Onboarding is now a manual config snippet — no installer — so
+// AMs add only the [mcp_servers.myra] block and delete any legacy day-ai block by hand.)
 
 import fs from 'node:fs';
 import path from 'node:path';

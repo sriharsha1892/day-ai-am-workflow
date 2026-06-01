@@ -20,7 +20,7 @@ for (const check of checks) {
 }
 
 if (!ok) {
-  console.log('\nRe-run your myRA one-click installer (myra-setup-<you>.cmd), then restart Codex or open a fresh session.');
+  console.log('\nPaste your myRA config snippet into ~/.codex/config.toml (see docs/am-onboarding-manual.md), then restart Codex.');
   process.exit(1);
 }
 
@@ -34,7 +34,7 @@ function checkFile(path) {
 }
 
 // SoR-by-default: the worker must be the ONLY path to Day AI. A direct `day-ai` MCP server bypasses
-// it, so its ABSENCE is the healthy state (the installer comments any legacy block out).
+// it, so its ABSENCE is the healthy state (onboarding adds only the myra block; delete any legacy day-ai block by hand).
 function checkNoActiveDayAi() {
   const result = spawnSync('codex', ['mcp', 'get', 'day-ai'], { encoding: 'utf8', stdio: 'pipe' });
   const present = result.status === 0;
@@ -42,7 +42,7 @@ function checkNoActiveDayAi() {
     label: 'No direct day-ai MCP server (Day AI routes through the worker)',
     ok: !present,
     detail: present
-      ? 'A direct "day-ai" MCP server is active — it bypasses the worker safeguards. Re-run your myRA installer to disable it.'
+      ? 'A direct "day-ai" MCP server is active — it bypasses the worker safeguards. Delete the [mcp_servers.day-ai] block from ~/.codex/config.toml.'
       : undefined,
   };
 }

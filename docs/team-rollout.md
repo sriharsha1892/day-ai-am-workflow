@@ -5,7 +5,7 @@ This repo is intended to be the single GitHub source for the myRA AM workflow.
 Each AM should:
 
 1. Clone the repo.
-2. Onboard via the hosted worker — run your one-click installer (myra-setup-<you>.cmd). (`npm run setup:codex` is deprecated.)
+2. Onboard via the hosted worker — paste your myRA config snippet into `~/.codex/config.toml` (see `docs/am-onboarding-manual.md`). (`npm run setup:codex` is deprecated.)
 3. Run `npm run doctor:codex`.
 4. Open Codex from the repo folder.
 5. Use the slash commands defined in `AGENTS.md`.
@@ -87,7 +87,7 @@ For Satya's first trial, ask him to run:
 ```bash
 git clone <GITHUB_REPO_URL>
 cd <REPO_FOLDER>
-npm run doctor:codex   # setup:codex deprecated — onboard via the hosted worker (one-click installer)
+npm run doctor:codex   # setup:codex deprecated — onboard via the manual config snippet (docs/am-onboarding-manual.md)
 npm run doctor:codex
 ```
 

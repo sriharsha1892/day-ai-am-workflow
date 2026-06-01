@@ -49,9 +49,9 @@ if (token) {
   persistTokenFile(amEmail, token);
 }
 
-if (token && args.installer) {
-  const r = spawnSync('node', ['scripts/make-am-installer.mjs', '--am', amEmail], { stdio: 'inherit' });
-  if (r.status !== 0) process.stderr.write('installer generation failed (run `npm run am:installer -- --am <email>` manually)\n');
+if (token && (args.config || args.installer)) {
+  const r = spawnSync('node', ['scripts/make-am-config.mjs', '--am', amEmail], { stdio: 'inherit' });
+  if (r.status !== 0) process.stderr.write('config snippet generation failed (run `npm run am:config -- --am <email>` manually)\n');
 }
 
 print(amEmail, token, revoke);
@@ -153,9 +153,9 @@ function print(email, t, isRevoke) {
   process.stdout.write(`Issued + activated token for ${email} — live now, no redeploy.\n\n`);
   process.stdout.write(`  Token: ${t}\n\n`);
   process.stdout.write('Next steps:\n');
-  process.stdout.write(`  1. Build the one-click installer: npm run issue-am-token -- --am ${email} --installer\n`);
+  process.stdout.write(`  1. Generate the AM's config snippet: npm run issue-am-token -- --am ${email} --config\n`);
   process.stdout.write('     (or hand the token to the AM via 1Password Send — one-time view).\n');
-  process.stdout.write('  2. Point them at docs/am-onboarding-windows.md.\n');
+  process.stdout.write('  2. Point them at docs/am-onboarding-manual.md.\n');
 }
 
 function parseArgs(argv) {

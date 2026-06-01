@@ -12,11 +12,15 @@ const CTX = JSON.parse(fs.readFileSync(path.resolve('workflow/config/myra-contex
 const PACKS = JSON.parse(fs.readFileSync(path.resolve('workflow/config/packs.json'), 'utf8'));
 
 const ALL_ROLE_BUCKETS = PACKS.personaPacks?.balanced?.roleBuckets ?? Object.keys(CTX.personaFrames);
-const SALESY = [
+// Tone gate — admin-tunable via myra-context.json firstTouch.salesyBlocklist (falls back to these).
+const SALESY = CTX.firstTouch?.salesyBlocklist ?? [
   'demo', 'pricing', 'buy ', 'purchase', 'discount', 'sign up', 'signup', 'onboard',
   'free trial', 'game-changer', 'game changer', 'revolutionary', 'best-in-class',
   'synerg', 'cutting-edge', 'world-class', 'unlock value', 'leverage our',
 ];
+const LENGTH_CAP_CSUITE = CTX.firstTouch?.lengthCaps?.cSuite ?? 70;
+const LENGTH_CAP_DEFAULT = CTX.firstTouch?.lengthCaps?.default ?? 110;
+const FALLBACK_PERSONA = CTX.firstTouch?.fallbackPersona ?? 'Market Intelligence';
 
 // Map a contact's title/roleBucket to a myRA persona frame (shared with linkedin.mjs).
 export function personaFrameFor({ title, roleBucket, personaPack }) {
@@ -25,7 +29,7 @@ export function personaFrameFor({ title, roleBucket, personaPack }) {
     const buckets = PACKS.personaPacks?.[personaPack]?.roleBuckets ?? ALL_ROLE_BUCKETS;
     frameKey = matchRoleBucket(title ?? '', buckets) ?? null;
   }
-  if (!frameKey || !CTX.personaFrames[frameKey]) frameKey = 'Market Intelligence';
+  if (!frameKey || !CTX.personaFrames[frameKey]) frameKey = FALLBACK_PERSONA;
   return { frameKey, frameText: CTX.personaFrames[frameKey] };
 }
 
@@ -95,7 +99,7 @@ export function composeFirstTouch(input) {
     softCta: /worth|open to|compare notes|quick|point me/i.test(ctaLine),
     leadsWithThem: /^hi /i.test(bodyText.trim()),
     lengthWords: wordCount,
-    lengthOk: wordCount <= (tier === 'c' ? 70 : 110),
+    lengthOk: wordCount <= (tier === 'c' ? LENGTH_CAP_CSUITE : LENGTH_CAP_DEFAULT),
   };
 
   return {

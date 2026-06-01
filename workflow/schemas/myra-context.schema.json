@@ -28,6 +28,19 @@
       "additionalProperties": { "type": "string" },
       "minProperties": 1
     },
-    "requiredOutputChecks": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+    "requiredOutputChecks": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "firstTouch": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "salesyBlocklist": { "type": "array", "items": { "type": "string" } },
+        "lengthCaps": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "cSuite": { "type": "number" }, "default": { "type": "number" } }
+        },
+        "fallbackPersona": { "type": "string" }
+      }
+    }
   }
 }

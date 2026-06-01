@@ -51,5 +51,14 @@
     "Name the signal, evidence, or hypothesis being used.",
     "Name the next AM decision or approval point.",
     "Keep source trails where evidence affects the recommendation."
-  ]
+  ],
+  "firstTouch": {
+    "salesyBlocklist": [
+      "demo", "pricing", "buy ", "purchase", "discount", "sign up", "signup", "onboard",
+      "free trial", "game-changer", "game changer", "revolutionary", "best-in-class",
+      "synerg", "cutting-edge", "world-class", "unlock value", "leverage our"
+    ],
+    "lengthCaps": { "cSuite": 70, "default": 110 },
+    "fallbackPersona": "Market Intelligence"
+  }
 }

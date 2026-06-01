@@ -86,7 +86,7 @@ Every in-scope tool result is stamped with an interpretation block (interpretati
   Source — interpretation.source  ([badge] + confidence cue + any cache/cost/staleness flag)
 Badges: FS Freshsales · AP Apollo · CO Clearout · DAY Day AI. Use interpretation.confidence as stamped (high/med/low) — do not recompute. If interpretation.glyph is present, show it inline on the verdict.
 The Source line already encodes cache state ("served from cache (0 credits)"), staleness ("refreshed Xh ago", with "add refresh:true to re-pull" once stale), and "needs cost approval — nothing spent yet". Echo those cues; never invent your own. On needsCostApproval, STOP and relay the projected cost; only after the AM approves re-call with confirmSpend:true.
-When interpretation.groups is present, render each group under its own heading, in order: "Existing MI contacts" (Freshsales — people Mordor Intelligence already knows) ABOVE "Net-new (Apollo)" (prospects not yet in MI's CRM). Print each group's rows[] verbatim; NEVER merge the two groups. Show emptyState when a group is empty. The Freshsales row shows "▲ contacted <relative date>" only when there is a real recent sales touch (a field edit is never a contact). Apollo rows lead "★ Recommended" then "Maybe"; skip Hold unless the AM asks. Present Recommended as a pre-approved batch by name; walk Maybe one at a time.
+When interpretation.groups is present, render each group under its own heading, in order: "Existing MI contacts" (Freshsales — people Mordor Intelligence already knows) ABOVE "Net-new (Apollo)" (prospects not yet in MI's CRM). Print each group's rows[] verbatim; NEVER merge the two groups. Show emptyState when a group is empty. The Freshsales row shows "↩ contacted <relative date>" only when there is a real recent sales touch (a field edit is never a contact). Apollo rows lead "★ Recommended" then "Maybe"; skip Hold unless the AM asks. Present Recommended as a pre-approved batch by name; walk Maybe one at a time.
 On "show details" / "why?": expand interpretation.confidenceReason (why this confidence) and, for a receipt, summary.whyColor (the plain-English reasons it's Yellow/Red) — and briefly state what you did NOT do (did not write to Freshsales; did not merge Freshsales + Apollo; did not send anything). Keep this OFF by default (only on Yellow/Red or when asked).
 
 ## Contact selection (map_contacts / source_new_contacts)
@@ -120,8 +120,15 @@ Honor the AM's saved preferences (get_my_preferences) — signature, default ton
 
 Keep every recommendation grounded in myRA positioning: decision-grade, expert-validated market/competitor/customer/supplier/trend intelligence.`;
 
+let PKG_VERSION = '0.0.0';
+try {
+  PKG_VERSION = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8')).version ?? PKG_VERSION;
+} catch {
+  /* package.json not resolvable at runtime → keep fallback (don't let the handshake throw) */
+}
+
 export const serverOptions = {
-  serverInfo: { name: 'myra-am-worker', version: '0.3.0' },
+  serverInfo: { name: 'myra-am-worker', version: PKG_VERSION },
   instructions: INSTRUCTIONS,
 };
 
@@ -1101,7 +1108,7 @@ export function initializeServer(server) {
    • Email: address + Clearout verdict (✔ verified / ▲ risky / ✕ invalid) + credits used.
    • LinkedIn (I send manually): the connection note ("247/300 ✔") + profile URL — "copy the note, open the profile, send the request."
    • Draft email: subject + body, and which persona frame + angle it used.
-   • If work_contact flags recentTouch, warn me up front ("▲ emailed 12 days ago").
+   • If work_contact flags recentTouch, warn me up front ("↩ emailed 12 days ago").
    • If work_contact returns needsCostApproval, tell me the projected credits and ask me to approve BEFORE spending — then re-call with confirmSpend:true. Nothing was spent yet.
    • Only a verified email is queue-ready; if it's risky/unknown/invalid, flag it as held-for-review, not ready to send.
 3. STOP and ask: "Approve, edit, or skip?"

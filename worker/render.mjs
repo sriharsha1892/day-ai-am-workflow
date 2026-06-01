@@ -177,7 +177,7 @@ const BUILDERS = {
     const branch = noEmail ? 'noEmail' : 'ready';
     const queueNote = verdict === 'verified' ? 'Queue-ready.' : 'Held for review — not queue-ready.';
     const recentTouchNote = r.recentTouch
-      ? ` ▲ already touched ${r.recentTouch.when} (${r.recentTouch.channel}, ${r.recentTouch.byWhom}).`
+      ? ` ↩ already touched ${r.recentTouch.when} (${r.recentTouch.channel}, ${r.recentTouch.byWhom}).`
       : '';
     return {
       branch,
@@ -273,7 +273,7 @@ export function groupContacts(toolName, result, config) {
   return out.sort((a, b) => a.order - b.order);
 }
 
-// "[FS] Name — Title · owner · ▲ contacted <relative>" — the ▲ ONLY on a real recent touch
+// "[FS] Name — Title · owner · ↩ contacted <relative>" — the ↩ ONLY on a real recent touch
 // (freshsales.mjs maps lastActivity from last_contacted_via_sales_activity, NULL otherwise). Owner
 // prefers the resolved ownerName (provider attaches it), falling back to "owner <id>" then "unowned".
 function renderFreshsalesGroup(contacts, g) {

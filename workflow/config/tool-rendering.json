@@ -37,7 +37,7 @@
       "sourceTool": "freshsales_evidence",
       "sourceField": "contacts",
       "rowTemplate": "[FS] {name} — {title} · {owner}{touchNote}",
-      "touchTemplate": " · ▲ contacted {when}",
+      "touchTemplate": " · ↩ contacted {when}",
       "touchMaxDays": 30,
       "emptyState": "No existing MI contacts in Freshsales for this domain."
     },
@@ -259,7 +259,7 @@
         }
       },
       "verdictGlyphs": {
-        "color": { "green": "●", "yellow": "▲", "red": "■" }
+        "color": { "green": "●", "yellow": "◐", "red": "■" }
       }
     },
 

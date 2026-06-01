@@ -91,7 +91,7 @@ results.push(
 );
 
 results.push(
-  await test('Freshsales group: title, owner name, ▲ touch rules', () => {
+  await test('Freshsales group: title, owner name, ↩ touch rules', () => {
     const g = groupContacts('freshsales_evidence', {
       contacts: [
         { name: 'Priya', title: 'Head of MI', owner: 4471, ownerName: 'Satish', lastActivity: iso(8) },
@@ -103,9 +103,9 @@ results.push(
     assert.equal(fs.title, 'Existing MI contacts');
     assert.equal(fs.order, 1);
     assert.ok(fs.rows[0].includes('owner Satish'), fs.rows[0]);
-    assert.ok(fs.rows[0].includes('▲ contacted 8 days ago'), fs.rows[0]);
-    assert.ok(!fs.rows[1].includes('▲'), 'a 45-day-old touch must NOT flag ▲');
-    assert.ok(!fs.rows[2].includes('▲') && fs.rows[2].includes('unowned'), fs.rows[2]);
+    assert.ok(fs.rows[0].includes('↩ contacted 8 days ago'), fs.rows[0]);
+    assert.ok(!fs.rows[1].includes('↩'), 'a 45-day-old touch must NOT flag ↩');
+    assert.ok(!fs.rows[2].includes('↩') && fs.rows[2].includes('unowned'), fs.rows[2]);
   }),
 );
 

@@ -130,11 +130,18 @@ async function runPool(items, limit, fn) {
   return out;
 }
 
+// Deliverability policy: which raw Clearout verdicts count as verified/invalid (everything else,
+// incl. accept_all/unknown, is risky → held from the verified-only queue). Env-overridable so the
+// bounce-vs-throughput tradeoff is tunable without a redeploy. Behaviour-preserving defaults.
+const VERDICT_POLICY = {
+  verified: (process.env.CLEAROUT_VERIFIED_VERDICTS ?? 'valid,verified,safe_to_send').split(',').map((s) => s.trim()),
+  invalid: (process.env.CLEAROUT_INVALID_VERDICTS ?? 'invalid,undeliverable,rejected_email').split(',').map((s) => s.trim()),
+};
+
 function mapStatus(verdict) {
-  const v = String(verdict ?? '').toLowerCase();
-  if (v === 'valid' || v === 'verified' || v === 'safe_to_send') return 'verified';
-  if (v === 'risky' || v === 'accept_all' || v === 'unknown') return 'risky';
-  if (v === 'invalid' || v === 'undeliverable' || v === 'rejected_email') return 'invalid';
+  const v = String(verdict ?? '').toLowerCase().trim();
+  if (VERDICT_POLICY.verified.includes(v)) return 'verified';
+  if (VERDICT_POLICY.invalid.includes(v)) return 'invalid';
   return 'risky';
 }
 

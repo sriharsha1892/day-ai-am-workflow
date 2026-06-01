@@ -1,7 +1,8 @@
 // Full MCP client sequence against production: initialize -> initialized -> tools/call.
 // Proves the Codex→MCP→tool→provider path end to end on Vercel.
 // Run: node scripts/tests/mcp-prod-toolcall.mjs
-const BASE = process.env.MCP_BASE ?? 'https://myra-am-worker.vercel.app/mcp';
+import { workerMcpUrl } from '../worker-url.mjs';
+const BASE = workerMcpUrl();
 const TOKEN = process.env.MCP_TOKEN ?? 'tok_satya_16b698ab18dc27e76aaabb17c6a84453fb9dc8e9d15d13ea';
 
 let sessionId = null;

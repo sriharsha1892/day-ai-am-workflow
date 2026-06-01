@@ -19,7 +19,8 @@
 //   apollo_enrich · clearout_verify · dayai_write · work_contact(real email)
 // ────────────────────────────────────────────────────────────────────────────────────────
 
-const MCP_BASE = process.env.MCP_BASE ?? 'https://myra-am-worker.vercel.app/mcp';
+import { workerMcpUrl } from '../worker-url.mjs';
+const MCP_BASE = workerMcpUrl();
 const TOKEN = process.env.MCP_TOKEN ?? 'tok_satya_16b698ab18dc27e76aaabb17c6a84453fb9dc8e9d15d13ea';
 // Origin (no /mcp) for the unauthenticated REST endpoints (health, discovery).
 const ORIGIN = MCP_BASE.replace(/\/mcp\/?$/, '');

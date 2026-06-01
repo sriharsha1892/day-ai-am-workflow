@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyEnv, loadLocalEnv, envPath } from './env-utils.mjs';
+import { workerBaseUrl, usingDefaultWorkerBase } from './worker-url.mjs';
 
 const TEMPLATE = 'templates/myra-setup.ps1.tmpl';
 
@@ -59,7 +60,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     console.error('Missing --am <email>. e.g. node scripts/make-am-installer.mjs --am satish@ask-myra.ai');
     process.exit(1);
   }
-  const url = args.url ?? process.env.WORKER_BASE_URL ?? 'https://myra-am-worker.vercel.app';
+  const url = args.url ?? workerBaseUrl();
+  if (!args.url && usingDefaultWorkerBase()) {
+    console.warn(`WARNING: WORKER_BASE_URL is not set — building the installer against the default host ${url}. Set WORKER_BASE_URL if the worker lives elsewhere.`);
+  }
   let token = typeof args.token === 'string' ? args.token : null;
   if (!token) {
     const tokenFile = path.resolve('.tokens', `${amEmail}.txt`);

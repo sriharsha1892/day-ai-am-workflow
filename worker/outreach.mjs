@@ -208,6 +208,20 @@ export async function runWorkContactLoop({ amEmail, canonicalDomain, contact, pr
     preferences: prefs,
   });
 
+  // Cross-source email conflict: a CRM-known email that disagrees with the Apollo-discovered one.
+  // Apollo is canonical for email (CLAUDE.md conflict table) — surface it so a stale CRM email isn't
+  // queued (protects the <5% bounce goal). Freshsales stays READ-ONLY; this only surfaces.
+  const emailConflict =
+    contact.knownEmail && emailTrack.address && contact.knownEmail.toLowerCase() !== emailTrack.address.toLowerCase()
+      ? {
+          field: 'email',
+          crm: contact.knownEmail,
+          enriched: emailTrack.address,
+          recommended: emailTrack.address,
+          note: 'CRM email differs from the Apollo-discovered email — Apollo is canonical for email. Confirm which is current before sending.',
+        }
+      : null;
+
   return {
     ok: true,
     contact: { name: contact.name, title: contact.title, apolloPersonId: contact.apolloPersonId },
@@ -215,6 +229,7 @@ export async function runWorkContactLoop({ amEmail, canonicalDomain, contact, pr
     linkedin: linkedinTrack,
     draft,
     recentTouch: touch,
+    conflict: emailConflict,
     credits: { apollo: emailTrack.creditsApollo ?? 0, clearout: emailTrack.creditsClearout ?? 0 },
     // Don't silently veto a non-verified email — surface the choice to the AM.
     emailDecision:

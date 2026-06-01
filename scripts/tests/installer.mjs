@@ -26,7 +26,8 @@ results.push(
     assert.ok(ps.includes('sandbox = "unelevated"'), 'pre-empts the admin-sandbox error');
     assert.ok(ps.includes('mcp_servers.myra'), 'writes the myra MCP server block');
     assert.ok(ps.includes('list_my_accounts'), 'verifies by listing accounts');
-    assert.ok(ps.includes('mcp_servers\\.(?:day-ai|"day-ai")'), 'ships the legacy day-ai neutralizer regex (Day AI SoR by default)');
+    const psCollapsed = ps.replace(/''/g, "'"); // simulate PowerShell collapsing '' -> ' in the regex literal
+    assert.ok(psCollapsed.includes(`mcp_servers\\.(?:day-ai|"day-ai"|'day-ai')`), 'ships the broadened day-ai neutralizer (bare / double- / single-quoted keys)');
     assert.ok(ps.includes('legacy direct Day AI MCP disabled'), 'stamps the disabled note when commenting the legacy block');
     assert.ok(!ps.includes('{{'), 'no unresolved template placeholders');
   }),

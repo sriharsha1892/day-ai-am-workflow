@@ -34,7 +34,7 @@ if (Test-Path $cfg) {
   # myRA worker is the SOLE Day AI path -- this keeps Day AI the system of record by default.
   # Comment it out (don't delete): it is the broken day.ai OAuth server, and commenting keeps an
   # audit trail and stops Codex re-attempting that broken OAuth on every session start.
-  $existing = [regex]::Replace($existing, '(?ms)^\[mcp_servers\.(?:day-ai|"day-ai")\].*?(?=^\[|\Z)', {
+  $existing = [regex]::Replace($existing, '(?ms)^\[mcp_servers\.(?:day-ai|"day-ai"|''day-ai'')\].*?(?=^\[|\Z)', {
     param($m)
     $body = ($m.Value.TrimEnd() -split '\r?\n' | ForEach-Object { '# ' + $_ }) -join "`r`n"
     "# myRA: legacy direct Day AI MCP disabled -- all Day AI writes go through the worker.`r`n" + $body + "`r`n`r`n"

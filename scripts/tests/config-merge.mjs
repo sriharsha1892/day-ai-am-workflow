@@ -17,8 +17,26 @@ import { test, assert } from './lib.mjs';
 
 const hasPwsh = spawnSync('pwsh', ['--version'], { encoding: 'utf8' }).status === 0;
 if (!hasPwsh) {
-  console.log('  SKIP  config-merge (pwsh not installed; installer.mjs guards the regex ships)');
-  process.exit(0);
+  // No pwsh on this box: still give behavioral coverage by deriving the header-matcher from the
+  // SHIPPED template regex and asserting it matches every legacy day-ai key form (bare / double- /
+  // single-quoted) but NOT a similarly-named server. (The full merge is exercised where pwsh exists.)
+  const tplRaw = fs.readFileSync(path.resolve('templates/myra-setup.ps1.tmpl'), 'utf8');
+  const m = tplRaw.match(/\^\\\[mcp_servers\\\.(\(\?:[^)]*\))\\\]/);
+  if (!m) {
+    console.error('  FAIL  config-merge: could not extract the neutralizer alternation from the template');
+    process.exit(1);
+  }
+  const alt = m[1].replace(/''/g, "'"); // PowerShell '' -> ' inside the single-quoted regex literal
+  const headerRe = new RegExp('^\\[mcp_servers\\.' + alt + '\\]', 'm');
+  let ok = true;
+  for (const h of ['[mcp_servers.day-ai]', '[mcp_servers."day-ai"]', "[mcp_servers.'day-ai']"]) {
+    if (!headerRe.test(h)) { console.error('  FAIL  neutralizer should match ' + h); ok = false; }
+  }
+  for (const h of ['[mcp_servers.day-ai-staging]', '[mcp_servers.myra]']) {
+    if (headerRe.test(h)) { console.error('  FAIL  neutralizer should NOT match ' + h); ok = false; }
+  }
+  console.log(ok ? '  OK  (pwsh absent) neutralizer header-match coverage — bare/double/single-quoted' : '  FAIL  header-match coverage');
+  process.exit(ok ? 0 : 1);
 }
 
 // Build a runnable PowerShell = the EXACT "# 2) Write / merge" section from the template,
@@ -138,6 +156,29 @@ results.push(
     assert.ok(!/^\[mcp_servers\."?day-ai"?\]/m.test(out), 'LF-only day-ai header neutralized');
     assert.ok(/^\[mcp_servers\.other\]/m.test(out), 'LF-only other server intact');
     assert.equal((out.match(/^\[mcp_servers\.myra\]/gm) || []).length, 1, 'worker block added once');
+  }),
+);
+
+results.push(
+  await test("single-quoted literal key [mcp_servers.'day-ai'] is also neutralized", () => {
+    const sq = ["[mcp_servers.'day-ai']", 'url = "https://day.ai/api/mcp"', '', '[mcp_servers.other]', 'url = "https://other.test/mcp"', ''].join('\r\n');
+    const out = runMerge(freshHome(sq));
+    assert.ok(!/^\[mcp_servers\.'day-ai'\]/m.test(out), 'no ACTIVE single-quoted day-ai header survives');
+    assert.ok(out.includes("# [mcp_servers.'day-ai']"), 'single-quoted legacy header commented out');
+    assert.ok(/^\[mcp_servers\.other\]/m.test(out), 'unrelated server intact');
+    assert.equal((out.match(/^\[mcp_servers\.myra\]/gm) || []).length, 1, 'worker block added once');
+  }),
+);
+
+results.push(
+  await test('a re-introduced active day-ai block (stray setup:codex) is re-neutralized on next install', () => {
+    const home = freshHome(FIXTURE);
+    runMerge(home); // first install: legacy day-ai commented, worker block added
+    // simulate something re-adding an ACTIVE direct day-ai server afterwards (the re-intro vector)
+    fs.appendFileSync(path.join(home, '.codex', 'config.toml'), '\r\n[mcp_servers.day-ai]\r\nurl = "https://day.ai/api/mcp"\r\n');
+    const out = runMerge(home); // re-running the installer must restore the SoR invariant
+    assert.ok(!/^\[mcp_servers\."?day-ai"?\]/m.test(out), 'no ACTIVE day-ai header survives the next install');
+    assert.equal((out.match(/^\[mcp_servers\.myra\]/gm) || []).length, 1, 'still exactly one worker block');
   }),
 );
 

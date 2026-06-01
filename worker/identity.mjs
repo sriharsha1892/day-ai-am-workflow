@@ -11,6 +11,16 @@ const POLICY = JSON.parse(
   fs.readFileSync(path.resolve('workflow/config/org-resolution.json'), 'utf8'),
 );
 
+// Confidence gates + scoring weights are the single source of truth in org-resolution.json so an
+// admin can tune match strictness without a redeploy. Fall back to the prior literals if absent.
+const WEIGHTS = POLICY.scoringWeights ?? {
+  exactCanonicalDomain: 0.99,
+  knownSourceId: 0.99,
+  sameNormalizedName: 0.88,
+  nameContainment: 0.76,
+};
+const GATES = POLICY.decisionPolicy;
+
 export function canonicalDomain(value) {
   return String(value ?? '')
     .trim()
@@ -47,30 +57,30 @@ export function scoreCandidate(target, candidate) {
     candidate.canonicalDomain &&
     candidate.canonicalDomain === target.canonicalDomain
   ) {
-    confidence = 0.99;
-    evidence.push({ source: candidate.source, value: 'exact canonical domain', confidence: 0.99 });
+    confidence = WEIGHTS.exactCanonicalDomain;
+    evidence.push({ source: candidate.source, value: 'exact canonical domain', confidence: WEIGHTS.exactCanonicalDomain });
   }
 
   if (candidate.dayAiOrganizationId && target.dayAiOrganizationId === candidate.dayAiOrganizationId) {
-    confidence = Math.max(confidence, 0.99);
-    evidence.push({ source: 'day-ai', value: 'matched stored Day AI source ID', confidence: 0.99 });
+    confidence = Math.max(confidence, WEIGHTS.knownSourceId);
+    evidence.push({ source: 'day-ai', value: 'matched stored Day AI source ID', confidence: WEIGHTS.knownSourceId });
   }
 
   if (candidate.normalizedName && candidate.normalizedName === target.normalizedName) {
-    confidence = Math.max(confidence, 0.88);
+    confidence = Math.max(confidence, WEIGHTS.sameNormalizedName);
     evidence.push({
       source: candidate.source,
       value: 'same normalized account name',
-      confidence: 0.88,
+      confidence: WEIGHTS.sameNormalizedName,
     });
   }
 
   if (nameContains(candidate.normalizedName, target.normalizedName)) {
-    confidence = Math.max(confidence, 0.76);
+    confidence = Math.max(confidence, WEIGHTS.nameContainment);
     evidence.push({
       source: candidate.source,
       value: 'parent/subsidiary-style name containment',
-      confidence: 0.76,
+      confidence: WEIGHTS.nameContainment,
     });
   }
 
@@ -87,7 +97,7 @@ export function scoreCandidate(target, candidate) {
 }
 
 export function decide(best, candidateCount) {
-  if (!best || best.confidence < 0.49) {
+  if (!best || best.confidence < GATES.noCredibleMatch.maximumConfidence) {
     return {
       action: 'allow_new_org_after_receipt',
       matchStatus: 'allow_new_org',
@@ -100,7 +110,7 @@ export function decide(best, candidateCount) {
   // auto-LINK when a real Day AI Organization exists; otherwise CREATE it (root of the ITC bug:
   // a Freshsales-only 0.99 match was told to link to a Day AI org that didn't exist → "no record ID").
   const hasDayAiOrg = Boolean(best.dayAiOrganizationId);
-  if (best.confidence >= 0.98) {
+  if (best.confidence >= GATES.exactCanonicalDomain.minimumConfidence) {
     if (hasDayAiOrg) {
       return {
         action: 'auto_link_existing',
@@ -119,7 +129,7 @@ export function decide(best, candidateCount) {
       receiptColor: 'green',
     };
   }
-  if (best.confidence >= 0.9) {
+  if (best.confidence >= GATES.clearTypoOrNameVariant.minimumConfidence) {
     if (hasDayAiOrg) {
       return {
         action: 'auto_link_existing_with_receipt',
@@ -138,7 +148,7 @@ export function decide(best, candidateCount) {
       receiptColor: 'green',
     };
   }
-  if (best.confidence >= 0.75) {
+  if (best.confidence >= GATES.parentSubsidiary.minimumConfidence) {
     return {
       action: 'ask_parent_subsidiary_scope',
       matchStatus: 'ask_parent_subsidiary_scope',

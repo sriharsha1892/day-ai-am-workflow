@@ -37,6 +37,12 @@
     "Apollo organization ID/name/domain",
     "public website redirects and official source URLs"
   ],
+  "scoringWeights": {
+    "exactCanonicalDomain": 0.99,
+    "knownSourceId": 0.99,
+    "sameNormalizedName": 0.88,
+    "nameContainment": 0.76
+  },
   "decisionPolicy": {
     "exactCanonicalDomain": {
       "action": "auto_link_existing",

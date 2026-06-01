@@ -4,7 +4,14 @@
 import * as kv from './kv.mjs';
 
 const KEY = 'admin:thresholds';
-export const THRESHOLD_DEFAULTS = { overloadThreshold: 60, staleDays: 14, lowRunwayDays: 7 };
+export const THRESHOLD_DEFAULTS = {
+  overloadThreshold: 60,
+  staleDays: 14,
+  lowRunwayDays: 7,
+  // KV > env > default. Folded in so an admin can tune them via set_admin_thresholds (no redeploy).
+  creditFloor: Number(process.env.CREDIT_FLOOR ?? 50),
+  duplicateRiskMediumMax: Number(process.env.DUP_RISK_MEDIUM_MAX ?? 3),
+};
 
 export async function getThresholds() {
   const stored = await kv.get(KEY).catch(() => null);

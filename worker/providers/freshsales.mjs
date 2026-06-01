@@ -5,6 +5,7 @@
 // 'failed' status (NOT 'no_data') so an outage can't masquerade as an empty CRM and trigger a dup org.
 
 import { cached, freshsalesKey, TTL } from '../cache.mjs';
+import { getThresholds } from '../admin-config.mjs';
 
 const orgDomainEnv = () => process.env.FRESHSALES_ORG_DOMAIN ?? 'mordorintelligence';
 const apiKeyEnv = () => process.env.FRESHSALES_API_KEY;
@@ -193,12 +194,13 @@ export async function fetchFreshsalesEvidence({ canonicalDomain, accountName, al
       const contacts = perAccountResults.flatMap((r) => r.contacts);
       const deals = perAccountResults.flatMap((r) => r.deals);
 
+      const { duplicateRiskMediumMax } = await getThresholds();
       const duplicateRisk =
         accounts.length === 0
           ? 'none'
           : accounts.length === 1
             ? 'low'
-            : accounts.length <= 3
+            : accounts.length <= duplicateRiskMediumMax
               ? 'medium'
               : 'high';
 

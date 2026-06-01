@@ -11,12 +11,13 @@ import { getPreferences } from './preferences.mjs';
 import { peek, enrichKey, clearoutKey } from './cache.mjs';
 import { findWorkedContact } from './progress.mjs';
 import { getIdempotencyForAccount } from './store.mjs';
+import { getThresholds } from './admin-config.mjs';
 import { remainingCredits } from './credits.mjs';
 
 // Server-side spend gate (review P1c): don't spend when the Clearout balance is near this floor
 // unless the AM explicitly confirms. Apollo balance isn't exposed by the API, so Clearout (the
-// metered, exhaustible credit) is the gate. Env-overridable; not admin-exposed.
-const CREDIT_FLOOR = Number(process.env.CREDIT_FLOOR ?? 50);
+// metered, exhaustible credit) is the gate. The floor is admin-tunable
+// (admin:thresholds.creditFloor — KV > env CREDIT_FLOOR > default 50).
 
 // Bounded concurrency for bulk fan-out (respect Apollo 100/min + Clearout 1000/day).
 export async function mapLimit(items, limit, fn) {
@@ -113,14 +114,15 @@ export async function projectSpend(contact) {
 
 // Gate on Clearout balance vs the floor. Returns {block, clearoutRemaining, reason}.
 async function spendGate(projectedClearout) {
+  const { creditFloor } = await getThresholds();
   let clearoutRemaining = null;
   try {
     clearoutRemaining = await remainingCredits('clearout');
   } catch {
     /* unknown balance → don't block on a missing read */
   }
-  if (clearoutRemaining != null && clearoutRemaining - projectedClearout < CREDIT_FLOOR) {
-    return { block: true, clearoutRemaining, reason: ` Clearout balance (${clearoutRemaining}) is at/near the floor of ${CREDIT_FLOOR}.` };
+  if (clearoutRemaining != null && clearoutRemaining - projectedClearout < creditFloor) {
+    return { block: true, clearoutRemaining, reason: ` Clearout balance (${clearoutRemaining}) is at/near the floor of ${creditFloor}.` };
   }
   return { block: false, clearoutRemaining };
 }

@@ -47,12 +47,39 @@ function sortAccounts(list) {
   });
 }
 
-export async function listMyAccounts(amEmail, { status } = {}) {
+export async function listMyAccounts(amEmail, { status, priority, sort, untouchedDays } = {}) {
   const ids = await kv.smembers(k.index(amEmail));
   // Batched (mget) instead of a serial kv.get per account — turns 1+N round-trips into 2.
   const recs = await kv.mget(ids.map((id) => k.rec(amEmail, id)));
-  const records = recs.filter((rec) => rec && (!status || rec.status === status));
-  return { ok: true, amEmail, count: records.length, accounts: sortAccounts(records) };
+  let records = recs.filter(
+    (rec) => rec && (!status || rec.status === status) && (!priority || rec.priority === priority),
+  );
+
+  // Optional "untouched N+ days" filter — joins tour-state lastTouchedAt. Only paid when requested,
+  // so the common "what are my accounts?" stays at 2 KV round-trips.
+  if (untouchedDays != null) {
+    const cutoff = Date.now() - Number(untouchedDays) * 86_400_000;
+    const lastTouched = await Promise.all(
+      records.map(async (r) =>
+        r.canonicalDomain
+          ? (await getTourState(amEmail, r.canonicalDomain).catch(() => null))?.lastTouchedAt ?? null
+          : null,
+      ),
+    );
+    records = records.filter((_, i) => !lastTouched[i] || new Date(lastTouched[i]).getTime() < cutoff);
+  }
+
+  const accounts =
+    sort === 'name'
+      ? [...records].sort((a, b) => (a.accountName ?? '').localeCompare(b.accountName ?? ''))
+      : sortAccounts(records); // default: status -> priority
+  return {
+    ok: true,
+    amEmail,
+    count: accounts.length,
+    filter: { status: status ?? null, priority: priority ?? null, untouchedDays: untouchedDays ?? null, sort: sort ?? 'status' },
+    accounts,
+  };
 }
 
 export async function getAccount(amEmail, idOrDomain, { withTourState = true } = {}) {
@@ -186,11 +213,12 @@ export async function unassignAccount(actorEmail, { amEmail, accountId }) {
 
 export async function listAllAssignments() {
   const roster = await kv.smembers(k.roster());
+  // Fan out the per-AM reads concurrently (was a serial loop — the admin N+1).
+  const perAm = await Promise.all(roster.map(async (am) => ({ am, accounts: (await listMyAccounts(am)).accounts })));
   const byAm = {};
   const domainOwners = {}; // canonicalDomain -> [amEmail]
   let total = 0;
-  for (const am of roster) {
-    const { accounts } = await listMyAccounts(am);
+  for (const { am, accounts } of perAm) {
     byAm[am] = accounts;
     total += accounts.length;
     for (const a of accounts) {

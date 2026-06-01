@@ -101,6 +101,7 @@ export function composeFirstTouch(input) {
   return {
     ok: true,
     subject,
+    subjectVariants: subjectVariantsFor(frameKey),
     bodyText,
     bodyHtml,
     personaFrameUsed: `${frameKey} → ${frameText}`,
@@ -108,6 +109,13 @@ export function composeFirstTouch(input) {
     ctaUsed: ctaLine,
     seniorityTier: tier,
     toneChecks,
+    qualitySummary: qualitySummaryFrom(toneChecks),
+    refineHint: "Say 'warmer', 'punchier', or 'shorter' — or edit any line / change the CTA — and I'll redo it.",
+    appliedDefaults: {
+      signature: Boolean(preferences.signature),
+      tone: preferences.defaultTone ?? 'consultative',
+      personaPack: personaPack ?? preferences.defaultPersonaPack ?? null,
+    },
     requiredOutputChecks: {
       useCaseNamed: true,
       personaNamed: true,
@@ -143,6 +151,49 @@ function subjectFor(frameKey) {
     'Business Unit Leader': 'A quick note on your growth calls',
   };
   return map[frameKey] ?? 'A quick question';
+}
+
+// Three subject angles the AM can pick from (inquisitive / consultative / direct).
+function subjectVariantsFor(frameKey) {
+  const inquisitive = {
+    Strategy: 'How do you pressure-test strategy calls?',
+    'Market Intelligence': 'How do you keep market coverage current?',
+    'Insights/Research': 'How do you make research repeatable?',
+    Innovation: 'How do you sort signal from noise?',
+    'Corporate Development': 'How do you screen targets today?',
+    Procurement: 'How do you get fast supplier reads?',
+    'Business Unit Leader': 'How do the growth calls get made?',
+  };
+  const direct = {
+    Strategy: 'Decision-grade strategy reads, faster',
+    'Market Intelligence': 'Market coverage that stays current',
+    'Insights/Research': 'Research that compounds',
+    Innovation: 'Trust your scouting signals',
+    'Corporate Development': 'Screen targets faster',
+    Procurement: 'Defensible supplier reads, faster',
+    'Business Unit Leader': 'Stay ahead of the growth calls',
+  };
+  return {
+    inquisitive: inquisitive[frameKey] ?? 'A quick question',
+    consultative: subjectFor(frameKey),
+    direct: direct[frameKey] ?? subjectFor(frameKey),
+  };
+}
+
+// Fold the tone checks into a one-line "looks good / one nit" summary the model can read aloud.
+function qualitySummaryFrom(tc) {
+  const good = [];
+  if (tc.nonSalesy) good.push('non-salesy');
+  if (tc.softCta) good.push('soft CTA');
+  if (tc.leadsWithThem) good.push('leads with them');
+  if (tc.noFeatureDump) good.push('no feature dump');
+  if (tc.lengthOk) good.push(`${tc.lengthWords} words`);
+  const nits = [];
+  if (!tc.nonSalesy) nits.push('trim salesy phrasing');
+  if (!tc.oneReasonToTalk) nits.push('add one clear reason to talk');
+  if (!tc.softCta) nits.push('soften the CTA');
+  if (!tc.lengthOk) nits.push('shorten it');
+  return { good, nits };
 }
 
 function reasonToTalk(frameKey, proofPoint) {

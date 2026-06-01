@@ -214,6 +214,15 @@ export async function runWorkContactLoop({ amEmail, canonicalDomain, contact, pr
     draft,
     recentTouch: touch,
     credits: { apollo: emailTrack.creditsApollo ?? 0, clearout: emailTrack.creditsClearout ?? 0 },
+    // Don't silently veto a non-verified email — surface the choice to the AM.
+    emailDecision:
+      emailTrack.verdict === 'verified'
+        ? null
+        : {
+            verdict: emailTrack.verdict,
+            prompt: `Email is ${emailTrack.verdict} — skip and work a fresh contact, or queue it anyway for your review?`,
+            options: ['skip', 'queue anyway'],
+          },
   };
 }
 

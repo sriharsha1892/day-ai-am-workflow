@@ -72,7 +72,7 @@ You are the guided execution surface for a myRA Account Manager. Day AI is the s
 - Freshsales is READ-ONLY.
 - Every Day AI write carries an idempotency key and is attributed to the signed-in AM (approvedBy). Retries reuse the same key — never create duplicates.
 - AM approval is required before: canonical contact creation, external sends, lifecycle changes after intake.
-- If a tool fails, show a Red receipt with the exact failure and offer retry or abandon. Never silently retry with a new key.
+- If a tool fails, show a Red receipt with the exact failure, the tool's remedy line (what to do next), and offer retry or abandon. Never silently retry with a new key.
 
 ## How to render tool results
 Every in-scope tool result is stamped with an interpretation block (interpretation.{ran,found,means,source,confidence,glyph,groups}) derived from myra://config/tool-rendering. Render that block — never your own gloss of the raw JSON. Render EVERY such result as the same 4-line card:
@@ -91,10 +91,10 @@ Present Recommended candidates as a pre-approved batch by name (AM can veto any 
 Resolve the persona/cadence/channel packs, then walk each step's fields in sequence (channel? timing? tone? CTA?), accept "keep" for defaults, render a numbered preview, then write Actions + Drafts on approval.
 
 ## Cross-session
-On a fresh session, call next_resume to find the AM's highest-priority unfinished account and offer to continue it. On "bye"/"wrap up", summarize the session.
+On the FIRST message of a session, greet the AM by name, call next_resume, and offer their top unfinished account naming what was last done ("Hi Satish — last on ITC Friday: 3 contacts approved. Resume, or start fresh?"). On "bye"/"wrap up"/"done for today", give a brief wrap-up: accounts touched, contacts worked, drafts queued, credits used this month, any pending sync, and the resume suggestion.
 
 ## Account list
-"What are my accounts?" → call list_my_accounts (the AM's central assignment list; the xlsx is retired). guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health, team_brief, rollout_status, team_credits.
+"What are my accounts?" → call list_my_accounts. Render as a COMPACT aligned table (priority · status · account · domain), in the returned order. Map filter intents to args: "my P1s" → priority:'P1'; "ready to intake" → status:'ready_for_intake'; "untouched 7+ days" → untouchedDays:7; "alphabetical" → sort:'name'. (The xlsx is retired.) guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health, team_brief, rollout_status, team_credits.
 
 ## Per-contact outreach (work-contact)
 For "work this contact" / "work the next one": call work_contact. It runs email discovery+verification (Apollo+Clearout) and the LinkedIn note prep in parallel, then composes a NON-SALESY, designation-aware first touch (goal: earn ~15 min for a call, never pitch). Repeat touches are cheap — enriched emails (24h) and Clearout verdicts (30d) are cached, so a re-run can cost 0 credits; pass refresh:true only to force a fresh pull.
@@ -102,6 +102,7 @@ SPEND IS GATED SERVER-SIDE: if a call would push Clearout below its floor, work_
 QUEUE IS VERIFIED-ONLY: only a Clearout-verified email is queueReady; risky/unknown/invalid are held for review (queueHold says why) — never queue them to send.
 Show ONE card: email + verdict glyph (✅ verified / ⚠️ risky / ❌ invalid); the LinkedIn note + profile URL ("copy, open, send" — manual, never automated); the draft. Warn if recentTouch is set (you already worked them, a teammate did, or CRM activity). Then STOP for approve/edit/skip. On approval only: dayai_write draft-create + action-create channel:linkedin — pass contactKey (the email or apolloPersonId) so two contacts on the same account the same day don't collide into one write.
 "Work all the Recommended" → call work_contacts (plural) with the slate. It returns ONE aggregate cost-approval card first; re-call with confirmSpend:true to proceed, then present the stacked review list with approve-all / veto-by-name.
+When you show the draft: render the email as a copy-ready code block (subject on line 1, then body) and the LinkedIn note as its own code block, so the AM can one-tap copy. Lead with compose_first_touch's qualitySummary as a one-liner ("looks good: non-salesy, soft CTA, leads with them"), echo appliedDefaults ("using your signature + consultative tone"), offer the three subjectVariants (inquisitive / consultative / direct — ask which), and end with the refineHint. If work_contact returns emailDecision (a non-verified email), STOP and ask skip vs queue-anyway — never auto-queue a risky/invalid email.
 
 ## Preferences
 Honor the AM's saved preferences (get_my_preferences) — signature, default tone — in every draft; offer set_my_preferences when they express a standing choice ("always sign me as…").
@@ -157,8 +158,17 @@ function ok(result, toolName) {
   };
 }
 
+// Every Red receipt should tell the AM what to do next, not just what broke.
+function inferRemedy(message) {
+  const m = String(message).toLowerCase();
+  if (/401|unauthor|invalid_token|forbidden/.test(m)) return 'Your token may be stale — ask the admin to re-issue it (1Password Send).';
+  if (/timeout|timed out|unreachable|fetch failed|econn|503|429|rate/.test(m)) return 'Looks transient — try again in a minute.';
+  if (/no record id|iserror|pending_sync/.test(m)) return 'The Day AI write did not land — retry with the same idempotency key, or run show_pending_syncs.';
+  return 'If this keeps happening, tell the admin (paste the error text).';
+}
+
 function fail(message, extra = {}) {
-  const body = { ok: false, receiptColor: 'red', error: message, ...extra };
+  const body = { ok: false, receiptColor: 'red', error: message, remedy: extra.remedy ?? inferRemedy(message), ...extra };
   return {
     content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
     structuredContent: body,
@@ -480,12 +490,17 @@ export function initializeServer(server) {
     'list_my_accounts',
     {
       description:
-        "The signed-in AM's assigned account list (the answer to 'what are my accounts?'), sorted by status then priority. Replaces opening a spreadsheet. Optional status filter (e.g. ready_for_intake).",
-      inputSchema: { status: z.string().optional() },
+        "The signed-in AM's assigned account list (the answer to 'what are my accounts?'), sorted by status then priority. Replaces opening a spreadsheet. Filters: status (e.g. ready_for_intake), priority (P1/P2/P3), untouchedDays (only accounts not worked in N+ days), sort ('status' default | 'name'). Map 'my P1s' -> priority:'P1'; 'untouched 7+ days' -> untouchedDays:7.",
+      inputSchema: {
+        status: z.string().optional(),
+        priority: z.string().optional(),
+        untouchedDays: z.number().optional(),
+        sort: z.enum(['status', 'name']).optional(),
+      },
     },
     async (args, extra) => {
       try {
-        return ok(await listMyAccounts(amEmailFrom(extra), { status: args.status }));
+        return ok(await listMyAccounts(amEmailFrom(extra), { status: args.status, priority: args.priority, untouchedDays: args.untouchedDays, sort: args.sort }));
       } catch (e) {
         return fail(`list_my_accounts failed: ${e.message}`);
       }

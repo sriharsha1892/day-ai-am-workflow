@@ -7,7 +7,7 @@ import {
   fetchFreshsalesEvidence,
 } from './providers/freshsales.mjs';
 import { apolloPeopleSearch } from './providers/apollo.mjs';
-import { writeDayAiContextPage } from './providers/day-ai.mjs';
+import { writeDayAiContextPage, fetchDayAiOrgsByDomain, credsReady as dayAiCredsReady } from './providers/day-ai.mjs';
 import { getIdempotencyForAccount, pendingForAccount, queuePendingSync } from './store.mjs';
 import { getOutreachProgress, summarize as summarizeProgress } from './progress.mjs';
 
@@ -105,6 +105,21 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
       ? 'Some writes were saved via the shared service account (an AM Day AI sign-in had expired) — re-link with: codex mcp login myra'
       : undefined,
   };
+
+  // 3b. SoR drift check (best-effort, false-positive-safe): we recorded a Day AI Organization for
+  // this domain locally — does Day AI actually have it? Only runs when Day AI creds are present (so a
+  // no-creds dev run can't false-flag), and only reads the org by domain (cheap). Flags lost/out-of-
+  // band state the per-write read-back can't see. Full multi-object reconciliation is a follow-up.
+  if (dayAiCredsReady() && accountRecords.some((r) => r.type === 'organization')) {
+    const orgs = await fetchDayAiOrgsByDomain(canonicalDomain).catch(() => null);
+    if (Array.isArray(orgs) && orgs.length === 0) {
+      dayAiBlock.reconciliation = {
+        orgRecordedLocally: true,
+        foundInDayAi: false,
+        note: 'A Day AI Organization was recorded locally for this domain but none is found by domain on read-back — it may not have landed. Run show_pending_syncs / retry_all_pending.',
+      };
+    }
+  }
 
   // 4. Color is worst of all provider statuses + pending sync. whyColor = the reasons that fired,
   // in plain English (the "why is this Yellow/Red?" UX).

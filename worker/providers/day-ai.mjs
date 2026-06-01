@@ -18,7 +18,7 @@ function baseUrl() {
   return (process.env.DAY_AI_BASE_URL ?? 'https://day.ai').replace(/\/+$/, '');
 }
 
-function credsReady() {
+export function credsReady() {
   return Boolean(
     process.env.CLIENT_ID && process.env.CLIENT_SECRET && process.env.REFRESH_TOKEN,
   );

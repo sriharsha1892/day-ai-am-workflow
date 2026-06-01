@@ -39,12 +39,28 @@ export async function probe() {
   }
 }
 
+// Day AI rotates refresh tokens on use. Instance-local chain: a stale token -> its rotation, so a
+// warm worker keeps presenting the freshest token instead of re-failing on the original. (Cross-
+// instance persistence to the broker store is a separate, live-tested follow-up; the shared-token
+// fallback already prevents lockout when a cold instance hits an already-rotated token.)
+const rotatedRefreshTokens = new Map();
+function freshestRefresh(token) {
+  let t = token;
+  const seen = new Set();
+  while (t && rotatedRefreshTokens.has(t) && !seen.has(t)) {
+    seen.add(t);
+    t = rotatedRefreshTokens.get(t);
+  }
+  return t;
+}
+
 // refreshOverride: a specific AM's Day AI refresh token (from the OAuth broker) so the
 // write is attributed to that AM. Omitted → the shared integration REFRESH_TOKEN.
 async function ensureAccessToken(refreshOverride) {
-  const refreshToken = refreshOverride ?? process.env.REFRESH_TOKEN;
-  if (!refreshToken) throw new Error('No Day AI refresh token available');
-  const cacheKey = refreshOverride ? `am:${refreshOverride.slice(-12)}` : 'shared';
+  const baseToken = refreshOverride ?? process.env.REFRESH_TOKEN;
+  if (!baseToken) throw new Error('No Day AI refresh token available');
+  const refreshToken = refreshOverride ? freshestRefresh(baseToken) : baseToken;
+  const cacheKey = refreshOverride ? `am:${baseToken.slice(-12)}` : 'shared';
 
   const cached = tokenCaches.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + TOKEN_BUFFER_MS) {
@@ -69,6 +85,10 @@ async function ensureAccessToken(refreshOverride) {
   }
 
   const data = await response.json();
+  if (refreshOverride && data.refresh_token && data.refresh_token !== refreshToken) {
+    rotatedRefreshTokens.set(refreshToken, data.refresh_token);
+    if (baseToken !== refreshToken) rotatedRefreshTokens.set(baseToken, data.refresh_token);
+  }
   const expiresIn = data.expires_in ?? 3600;
   const entry = { accessToken: data.access_token, expiresAt: Date.now() + expiresIn * 1000 };
   tokenCaches.set(cacheKey, entry);

@@ -228,7 +228,7 @@ export const WRITE_HANDLERS = {
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id: id ?? `opp:${p.canonicalDomain}`,
+        id, // no fabrication: a missing id means Day AI didn't confirm the write -> dayAiWrite queues a pendingSync
         name: parsed?.title ?? p.title ?? `${p.canonicalDomain} opportunity`,
         link: id ? `${baseUrl()}/opportunities/${id}` : null,
       };
@@ -257,7 +257,7 @@ export const WRITE_HANDLERS = {
       const id = idFromResponse(parsed);
       const email = candidate.email;
       return {
-        id: id ?? email,
+        id, // no fabrication: an unconfirmed person write queues a pendingSync rather than claiming a fake save
         name: parsed?.title ?? (`${candidate.firstName ?? ''} ${candidate.lastName ?? ''}`.trim() || candidate.name || email),
         link: id ? `${baseUrl()}/people/${id}` : null,
       };
@@ -300,7 +300,7 @@ export const WRITE_HANDLERS = {
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id: id ?? `action:${p.canonicalDomain}:${String(p.contactEmail ?? p.summary ?? '').slice(0, 40)}`,
+        id, // no fabrication -> unconfirmed action queues a pendingSync
         name: parsed?.title ?? p.summary ?? p.title ?? 'Action',
         link: id ? `${baseUrl()}/actions/${id}` : null,
       };
@@ -319,7 +319,7 @@ export const WRITE_HANDLERS = {
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id: id ?? `draft:${p.canonicalDomain}:${String(p.contactEmail ?? p.subject ?? '').slice(0, 40)}`,
+        id, // no fabrication -> unconfirmed draft queues a pendingSync
         name: parsed?.title ?? p.subject ?? 'Draft',
         link: id ? `${baseUrl()}/drafts/${id}` : null,
       };
@@ -342,7 +342,7 @@ export const WRITE_HANDLERS = {
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id: id ?? `review-${p.canonicalDomain}-${Date.now()}`,
+        id, // no fabrication -> unconfirmed review-context queues a pendingSync
         name: parsed?.title ?? p.summary ?? 'Review context',
         link: id ? `${baseUrl()}/contexts/${id}` : null,
       };
@@ -391,8 +391,12 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
     type = handler.type;
   }
 
+  // Confirmation gate: a write is a success ONLY if Day AI confirmed it — a real echoed objectId,
+  // or a domain-keyed org id (the domain IS the org objectId). No id => the write was not confirmed
+  // (soft validation drop / tier gating / schema drift) => throw so the caller queues a pendingSync.
+  // We never fabricate a synthetic id and record a fake success with a dead link.
   if (!record?.id) {
-    throw new Error(`Day AI ${handler.tool ?? action} returned no record ID`);
+    throw new Error(`Day AI ${handler.tool ?? action} write not confirmed (no record id returned) — queued for retry`);
   }
 
   const persisted = {

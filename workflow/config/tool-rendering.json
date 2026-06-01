@@ -37,7 +37,7 @@
       "sourceTool": "freshsales_evidence",
       "sourceField": "contacts",
       "rowTemplate": "[FS] {name} — {title} · {owner}{touchNote}",
-      "touchTemplate": " · ⚠ contacted {when}",
+      "touchTemplate": " · ▲ contacted {when}",
       "touchMaxDays": 30,
       "emptyState": "No existing MI contacts in Freshsales for this domain."
     },
@@ -91,7 +91,7 @@
         }
       },
       "verdictGlyphs": {
-        "duplicateRisk": { "none": "—", "low": "✅", "medium": "⚠️", "high": "⛔", "unknown": "❓" }
+        "duplicateRisk": { "none": "—", "low": "✔", "medium": "▲", "high": "■", "unknown": "?" }
       }
     },
 
@@ -191,8 +191,8 @@
         }
       },
       "verdictGlyphs": {
-        "status":  { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" },
-        "verdict": { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" }
+        "status":  { "verified": "✔", "risky": "▲", "invalid": "✕", "failed": "✕" },
+        "verdict": { "verified": "✔", "risky": "▲", "invalid": "✕", "failed": "✕" }
       }
     },
 
@@ -224,7 +224,7 @@
         }
       },
       "verdictGlyphs": {
-        "ok": { "true": "✅", "false": "❌" }
+        "ok": { "true": "✔", "false": "✕" }
       }
     },
 
@@ -259,7 +259,7 @@
         }
       },
       "verdictGlyphs": {
-        "color": { "green": "🟢", "yellow": "🟡", "red": "🔴" }
+        "color": { "green": "●", "yellow": "▲", "red": "■" }
       }
     },
 
@@ -296,7 +296,7 @@
         }
       },
       "verdictGlyphs": {
-        "verdict": { "verified": "✅", "risky": "⚠️", "invalid": "❌", "failed": "❌" }
+        "verdict": { "verified": "✔", "risky": "▲", "invalid": "✕", "failed": "✕" }
       }
     },
 

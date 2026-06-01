@@ -18,7 +18,7 @@ async function clearoutLowBalanceAlert(usedThisMonth, remaining) {
   const { lowRunwayDays } = await getThresholds();
   const days = runwayDays(usedThisMonth, remaining);
   return days < lowRunwayDays
-    ? `⚠ Clearout runway ~${Math.round(days)}d (under the ${lowRunwayDays}d floor) — verify only high-value contacts until it's topped up.`
+    ? `▲ Clearout runway ~${Math.round(days)}d (under the ${lowRunwayDays}d floor) — verify only high-value contacts until it's topped up.`
     : null;
 }
 

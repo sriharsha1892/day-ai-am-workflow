@@ -73,25 +73,25 @@ results.push(
 );
 
 results.push(
-  await test('work_contact no-email → low + ❌ + held for review', () => {
+  await test('work_contact no-email → low + ✕ + held for review', () => {
     const c = interpret('work_contact', { ok: true, contact: { name: 'A', title: 'VP' }, email: { address: null, verdict: 'invalid', reason: 'no deliverable email found' }, credits: { apollo: 0, clearout: 0 } });
     assert.equal(c.confidence, 'low');
-    assert.equal(c.glyph, '❌');
+    assert.equal(c.glyph, '✕');
     assert.ok(/held for review/i.test(c.means), c.means);
   }),
 );
 
 results.push(
-  await test('work_contact verified → high + ✅ + queue-ready', () => {
+  await test('work_contact verified → high + ✔ + queue-ready', () => {
     const c = interpret('work_contact', { ok: true, contact: { name: 'A', title: 'VP' }, email: { address: 'a@b.com', verdict: 'verified' }, credits: { apollo: 1, clearout: 1 } });
     assert.equal(c.confidence, 'high');
-    assert.equal(c.glyph, '✅');
+    assert.equal(c.glyph, '✔');
     assert.ok(c.means.includes('Queue-ready.'), c.means);
   }),
 );
 
 results.push(
-  await test('Freshsales group: title, owner name, ⚠ touch rules', () => {
+  await test('Freshsales group: title, owner name, ▲ touch rules', () => {
     const g = groupContacts('freshsales_evidence', {
       contacts: [
         { name: 'Priya', title: 'Head of MI', owner: 4471, ownerName: 'Satish', lastActivity: iso(8) },
@@ -103,9 +103,9 @@ results.push(
     assert.equal(fs.title, 'Existing MI contacts');
     assert.equal(fs.order, 1);
     assert.ok(fs.rows[0].includes('owner Satish'), fs.rows[0]);
-    assert.ok(fs.rows[0].includes('⚠ contacted 8 days ago'), fs.rows[0]);
-    assert.ok(!fs.rows[1].includes('⚠'), 'a 45-day-old touch must NOT flag ⚠');
-    assert.ok(!fs.rows[2].includes('⚠') && fs.rows[2].includes('unowned'), fs.rows[2]);
+    assert.ok(fs.rows[0].includes('▲ contacted 8 days ago'), fs.rows[0]);
+    assert.ok(!fs.rows[1].includes('▲'), 'a 45-day-old touch must NOT flag ▲');
+    assert.ok(!fs.rows[2].includes('▲') && fs.rows[2].includes('unowned'), fs.rows[2]);
   }),
 );
 

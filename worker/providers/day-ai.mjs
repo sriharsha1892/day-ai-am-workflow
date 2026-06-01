@@ -277,11 +277,32 @@ export const WRITE_HANDLERS = {
   },
   'person-create': {
     tool: 'create_or_update_person_organization',
+    // Dedup-on-write: search Day AI for an existing contact by email first; if found, UPDATE it
+    // (isCreating:false + objectId) instead of creating a duplicate Person. Best-effort — a search
+    // failure never blocks the write (it proceeds as a create).
+    async prepare(p) {
+      const email = (p.candidate ?? p).email;
+      if (!email || !credsReady()) return {};
+      try {
+        const parsed = parseMcpResult(
+          await mcpCallTool('search_objects', {
+            queries: [{ objectType: 'native_contact', where: { propertyId: 'email', operator: 'eq', value: email } }],
+            propertiesToReturn: '*',
+          }),
+        );
+        const match = parsed?.native_contact?.results?.[0];
+        const existingPersonId = match?.objectId ?? match?.id ?? null;
+        return existingPersonId ? { existingPersonId } : {};
+      } catch {
+        return {};
+      }
+    },
     args: (p) => {
       const candidate = p.candidate ?? p;
       return {
-        isCreating: true,
+        isCreating: !p.existingPersonId, // update in place when the email already exists
         objectType: 'native_contact', // live enum is native_organization|native_contact (NOT 'Person')
+        ...(p.existingPersonId ? { objectId: p.existingPersonId } : {}),
         standardProperties: {
           email: candidate.email,
           firstName: candidate.firstName ?? candidate.name?.split(' ')[0],
@@ -295,10 +316,12 @@ export const WRITE_HANDLERS = {
     type: 'person',
     extractRecord: (parsed, p) => {
       const candidate = p.candidate ?? p;
-      const id = idFromResponse(parsed);
+      // existingPersonId is a real Day AI id (from the dedup search), so an update is confirmed even
+      // if the response doesn't re-echo the id. A bare create with no echoed id stays unconfirmed.
+      const id = idFromResponse(parsed) ?? p.existingPersonId ?? null;
       const email = candidate.email;
       return {
-        id, // no fabrication: an unconfirmed person write queues a pendingSync rather than claiming a fake save
+        id,
         name: parsed?.title ?? (`${candidate.firstName ?? ''} ${candidate.lastName ?? ''}`.trim() || candidate.name || email),
         link: id ? `${baseUrl()}/people/${id}` : null,
       };
@@ -421,6 +444,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
   } else {
     // dayAiToken (the signed-in AM's refresh token) attributes the write to that AM;
     // undefined falls back to the shared integration token.
+    if (handler.prepare) Object.assign(payload, (await handler.prepare(payload)) ?? {});
     const result = await mcpCallTool(handler.tool, handler.args(payload), dayAiToken);
     // Day AI can return a tool-level error (result.isError) WITHOUT a JSON-RPC error — mcpCallTool
     // lets that through, so guard here or extractRecord fabricates success on a failed write.

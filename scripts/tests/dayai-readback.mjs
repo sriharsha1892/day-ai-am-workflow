@@ -48,5 +48,19 @@ results.push(
   }),
 );
 
+results.push(
+  await test('person-create dedups: existingPersonId → update in place (no duplicate)', () => {
+    const h = WRITE_HANDLERS['person-create'];
+    const create = h.args({ candidate: { email: 'a@acme.com' } });
+    assert.equal(create.isCreating, true, 'no match → create');
+    assert.ok(!('objectId' in create), 'create has no objectId');
+    const update = h.args({ candidate: { email: 'a@acme.com' }, existingPersonId: 'person_9' });
+    assert.equal(update.isCreating, false, 'existing email → update');
+    assert.equal(update.objectId, 'person_9', 'update targets the existing object');
+    // an update is confirmed by the known existing id even if the response echoes none
+    assert.equal(h.extractRecord({}, { candidate: { email: 'a@acme.com' }, existingPersonId: 'person_9' }).id, 'person_9');
+  }),
+);
+
 const failed = results.filter((r) => !r.ok);
 process.exit(failed.length === 0 ? 0 : 1);

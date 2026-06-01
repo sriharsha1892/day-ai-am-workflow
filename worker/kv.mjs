@@ -55,7 +55,15 @@ function redis(client) {
     async get(key) {
       const raw = await client.get(key);
       if (raw == null) return null;
-      return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      // @upstash/redis auto-deserializes JSON: objects/numbers come back already parsed.
+      if (typeof raw !== 'string') return raw;
+      // A plain STRING value (e.g. an am-token -> email map) is NOT JSON — return it as-is rather
+      // than throwing on JSON.parse (which silently 401'd KV-only bearer tokens).
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return raw;
+      }
     },
     async set(key, value, opts = {}) {
       const payload = JSON.stringify(value);
@@ -77,7 +85,15 @@ function redis(client) {
     async mget(keys) {
       if (!keys || keys.length === 0) return [];
       const raw = await client.mget(...keys);
-      return raw.map((r) => (r == null ? null : typeof r === 'string' ? JSON.parse(r) : r));
+      return raw.map((r) => {
+        if (r == null) return null;
+        if (typeof r !== 'string') return r;
+        try {
+          return JSON.parse(r);
+        } catch {
+          return r;
+        }
+      });
     },
   };
 }

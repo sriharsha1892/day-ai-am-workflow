@@ -75,8 +75,27 @@ async function ensureAccessToken(refreshOverride) {
   return entry.accessToken;
 }
 
+// A per-AM Day AI token that's stale/revoked/rotated must not block the AM. Detect auth-shaped
+// refresh failures so mcpCallTool can fall back to the shared integration token.
+function isReauthError(err) {
+  return /401|403|invalid_grant|invalid_token|unauthor|token refresh/i.test(String(err?.message ?? err));
+}
+
 async function mcpCallTool(toolName, args = {}, refreshOverride) {
-  const accessToken = await ensureAccessToken(refreshOverride);
+  let accessToken;
+  let usedSharedFallback = false;
+  try {
+    accessToken = await ensureAccessToken(refreshOverride);
+  } catch (err) {
+    // Stale per-AM token -> fall back to the shared integration token + flag degraded attribution
+    // (decision 2026-06-01). A shared-token failure (no override) is a real outage and rethrows.
+    if (refreshOverride && isReauthError(err)) {
+      accessToken = await ensureAccessToken(undefined);
+      usedSharedFallback = true;
+    } else {
+      throw err;
+    }
+  }
   const response = await fetch(`${baseUrl()}/api/mcp`, {
     method: 'POST',
     headers: {
@@ -100,7 +119,9 @@ async function mcpCallTool(toolName, args = {}, refreshOverride) {
   if (data.error) {
     throw new Error(`Day AI MCP ${toolName} RPC error: ${JSON.stringify(data.error).slice(0, 300)}`);
   }
-  return data.result ?? data;
+  const result = data.result ?? data;
+  if (usedSharedFallback && result && typeof result === 'object') result.__sharedFallback = true;
+  return result;
 }
 
 function parseMcpResult(result) {
@@ -372,6 +393,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
   const payload = { approvingAm, canonicalDomain, idempotencyKey, ...rest };
   let record;
   let type;
+  let sharedFallback = false;
   if (handler.run) {
     const out = await handler.run(payload);
     record = out.record;
@@ -386,6 +408,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
       const msg = result.content?.[0]?.text ?? 'Day AI tool reported isError';
       throw new Error(`Day AI ${handler.tool} error: ${String(msg).slice(0, 300)}`);
     }
+    sharedFallback = Boolean(result?.__sharedFallback);
     const parsed = parseMcpResult(result);
     record = handler.extractRecord(parsed, payload);
     type = handler.type;
@@ -408,10 +431,19 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
     approvingAm,
     canonicalDomain,
     writtenAt: new Date().toISOString(),
+    attributedVia: sharedFallback ? 'shared-fallback' : dayAiToken ? 'per-am' : 'shared',
   };
   await recordIdempotency(idempotencyKey, persisted);
 
-  return { ok: true, action, ...persisted, raw: record };
+  return {
+    ok: true,
+    action,
+    ...persisted,
+    raw: record,
+    ...(sharedFallback
+      ? { attributionWarning: 'Your Day AI sign-in expired — saved via the shared service account. Re-link when you can: codex mcp login myra' }
+      : {}),
+  };
 }
 
 export async function writeDayAiContextPage({ canonicalDomain, organizationId, title, bodyMarkdown, approvingAm }) {

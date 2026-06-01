@@ -165,6 +165,7 @@ function ok(result, toolName) {
 // Every Red receipt should tell the AM what to do next, not just what broke.
 function inferRemedy(message) {
   const m = String(message).toLowerCase();
+  if (/token refresh|refresh_token|invalid_grant|reauth|sign-in expired/.test(m)) return 'Your Day AI sign-in expired — run: codex mcp login myra';
   if (/401|unauthor|invalid_token|forbidden/.test(m)) return 'Your token may be stale — ask the admin to re-issue it (1Password Send).';
   if (/timeout|timed out|unreachable|fetch failed|econn|503|429|rate/.test(m)) return 'Looks transient — try again in a minute.';
   if (/no record id|iserror|pending_sync/.test(m)) return 'The Day AI write did not land — retry with the same idempotency key, or run show_pending_syncs.';

@@ -46,6 +46,27 @@ export function buildInstaller({ amEmail, token, url, name }) {
   return { cmd, ps, psFileName };
 }
 
+// Manual onboarding (no .cmd, no executable) — for machines where AV/firewall blocks the installer.
+// Returns the config.toml blocks the AM pastes by hand.
+export function buildConfigSnippet({ token, url }) {
+  const cleanUrl = String(url).replace(/\/+$/, '');
+  return [
+    '# myRA — paste these blocks into your Codex config file, then restart Codex.',
+    '#   Windows:  %USERPROFILE%\\.codex\\config.toml   (e.g. C:\\Users\\You\\.codex\\config.toml)',
+    '#   Mac:      ~/.codex/config.toml',
+    '# If the file already exists, MERGE these in (keep any other [mcp_servers.*] you have).',
+    '# If you see an old [mcp_servers.day-ai] block, delete it — myRA goes through the server below.',
+    '',
+    '[windows]',
+    'sandbox = "unelevated"',
+    '',
+    '[mcp_servers.myra]',
+    `url = "${cleanUrl}/mcp"`,
+    `http_headers = { Authorization = "Bearer ${token}" }`,
+    '',
+  ].join('\n');
+}
+
 function parseArgs(argv) {
   const out = {};
   const list = argv.slice(2);
@@ -81,10 +102,23 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     }
     token = fs.readFileSync(tokenFile, 'utf8').trim();
   }
-  const { cmd, ps, psFileName } = buildInstaller({ amEmail, token, url, name: typeof args.name === 'string' ? args.name : undefined });
   const outDir = path.resolve('.tokens');
   fs.mkdirSync(outDir, { recursive: true, mode: 0o700 });
   const slug = amEmail.split('@')[0].replace(/[^a-z0-9]/gi, '') || 'am';
+
+  // Manual path (--manual / --config): emit a paste-able config.toml snippet, NO .cmd/.ps1. Use when
+  // corporate AV/firewall blocks running the installer — manual setup runs no executable.
+  if (args.manual || args.config) {
+    const cfgPath = path.join(outDir, `myra-config-${slug}.toml`);
+    fs.writeFileSync(cfgPath, buildConfigSnippet({ token, url }), { mode: 0o600 });
+    fs.chmodSync(cfgPath, 0o600);
+    console.log('OK manual config snippet written (SECRET — embeds the bearer token):');
+    console.log(`   ${cfgPath}`);
+    console.log(`\nShare it with ${amEmail} (1Password Send / secure). They paste the blocks into their Codex config.toml and restart Codex. No .cmd needed.`);
+    process.exit(0);
+  }
+
+  const { cmd, ps, psFileName } = buildInstaller({ amEmail, token, url, name: typeof args.name === 'string' ? args.name : undefined });
   // The .ps1 (the actual script) and the .cmd launcher MUST ship together (zip both).
   const psPath = path.join(outDir, psFileName);
   fs.writeFileSync(psPath, ps, { mode: 0o600 });

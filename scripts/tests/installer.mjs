@@ -3,9 +3,19 @@
 // -EncodedCommand line was ~10 KB and silently failed to run — "none of the CMD files open").
 
 import { test, assert } from './lib.mjs';
-import { buildInstaller } from '../../scripts/make-am-installer.mjs';
+import { buildInstaller, buildConfigSnippet } from '../../scripts/make-am-installer.mjs';
 
 const results = [];
+
+results.push(
+  await test('manual path: buildConfigSnippet emits the myra server block + sandbox fix + token', () => {
+    const snip = buildConfigSnippet({ token: 'tok_demo_123', url: 'https://myra-am-worker.vercel.app/' });
+    assert.ok(snip.includes('[mcp_servers.myra]'), 'myra server block');
+    assert.ok(snip.includes('url = "https://myra-am-worker.vercel.app/mcp"'), 'normalized url + /mcp (no //)');
+    assert.ok(snip.includes('Authorization = "Bearer tok_demo_123"'), 'token in the auth header');
+    assert.ok(snip.includes('sandbox = "unelevated"'), 'sandbox fix included');
+  }),
+);
 
 results.push(
   await test('buildInstaller emits a double-clickable .cmd launcher with NO over-limit line', () => {

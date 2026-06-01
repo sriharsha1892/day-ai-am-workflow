@@ -88,6 +88,7 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
       name: r.name,
       link: r.link,
       idempotencyKey: r.idempotencyKey,
+      attributedVia: r.attributedVia, // per-am | shared | shared-fallback (honest attribution)
     })),
     pendingSync: pendingSync.map((e) => ({
       attemptedWrite: e.attemptedWrite,
@@ -98,6 +99,11 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
     headlineReason: pendingSync.length > 0
       ? `${pendingSync.length} pending Day AI write(s) need retry.`
       : `${accountRecords.length} Day AI record(s) saved for this account.`,
+    // Honest attribution: if any write fell back to the shared service account (an AM's Day AI
+    // sign-in had expired), say so plainly rather than implying the AM personally authored it.
+    attributionNote: accountRecords.some((r) => r.attributedVia === 'shared-fallback')
+      ? 'Some writes were saved via the shared service account (an AM Day AI sign-in had expired) — re-link with: codex mcp login myra'
+      : undefined,
   };
 
   // 4. Color is worst of all provider statuses + pending sync. whyColor = the reasons that fired,

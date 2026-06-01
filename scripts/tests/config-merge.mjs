@@ -111,5 +111,35 @@ results.push(
   }),
 );
 
+results.push(
+  await test('legacy day-ai block as the LAST section is neutralized (end-of-file boundary)', () => {
+    const lastBlock = ['[windows]', 'sandbox = "unelevated"', '', '[mcp_servers.day-ai]', 'url = "https://day.ai/api/mcp"', ''].join('\r\n');
+    const out = runMerge(freshHome(lastBlock));
+    assert.ok(!/^\[mcp_servers\."?day-ai"?\]/m.test(out), 'no ACTIVE day-ai header at EOF survives');
+    assert.ok(out.includes('# [mcp_servers.day-ai]'), 'EOF day-ai block is commented');
+    assert.equal((out.match(/^\[mcp_servers\.myra\]/gm) || []).length, 1, 'worker block appended exactly once');
+  }),
+);
+
+results.push(
+  await test('similarly-named [mcp_servers.day-ai-staging] is NOT falsely neutralized', () => {
+    const mixed = ['[mcp_servers.day-ai]', 'url = "https://day.ai/api/mcp"', '', '[mcp_servers.day-ai-staging]', 'url = "https://staging.day.ai/api/mcp"', ''].join('\r\n');
+    const out = runMerge(freshHome(mixed));
+    assert.ok(/^\[mcp_servers\.day-ai-staging\]/m.test(out), 'day-ai-staging stays ACTIVE (no false positive)');
+    assert.ok(out.includes('# [mcp_servers.day-ai]'), 'the real day-ai block is commented');
+    assert.ok(!out.includes('# [mcp_servers.day-ai-staging]'), 'day-ai-staging is not commented');
+  }),
+);
+
+results.push(
+  await test('LF-only line endings are handled (no stray CR, day-ai neutralized)', () => {
+    const lf = ['[mcp_servers.day-ai]', 'url = "https://day.ai/api/mcp"', '', '[mcp_servers.other]', 'url = "https://other.test/mcp"', ''].join('\n');
+    const out = runMerge(freshHome(lf));
+    assert.ok(!/^\[mcp_servers\."?day-ai"?\]/m.test(out), 'LF-only day-ai header neutralized');
+    assert.ok(/^\[mcp_servers\.other\]/m.test(out), 'LF-only other server intact');
+    assert.equal((out.match(/^\[mcp_servers\.myra\]/gm) || []).length, 1, 'worker block added once');
+  }),
+);
+
 const failed = results.filter((r) => !r.ok);
 process.exit(failed.length === 0 ? 0 : 1);

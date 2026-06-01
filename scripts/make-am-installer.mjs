@@ -27,15 +27,23 @@ export function buildInstaller({ amEmail, token, url, name }) {
     .replaceAll('{{URL}}', cleanUrl)
     .replaceAll('{{EMAIL}}', amEmail)
     .replaceAll('{{NAME}}', name ?? amEmail.split('@')[0]);
-  // PowerShell -EncodedCommand expects base64 of UTF-16LE.
-  const encoded = Buffer.from(ps, 'utf16le').toString('base64');
+  // Delivery = a readable .ps1 + a TINY .cmd launcher that runs it.
+  // WHY: the previous single `powershell -EncodedCommand <base64>` line was ~10 KB — over cmd.exe's
+  // hard 8191-char line limit, so the .cmd silently failed to run ("nothing happens"). A tiny
+  // launcher has no long line, and shipping the plain .ps1 (no base64/iex) is also less likely to
+  // trip corporate AV and is inspectable. The two files travel together in the zip; the launcher
+  // resolves the .ps1 next to itself via %~dp0.
+  const slug = amEmail.split('@')[0].replace(/[^a-z0-9]/gi, '') || 'am';
+  const psFileName = `myra-setup-${slug}.ps1`;
   const cmd = [
     '@echo off',
     `title myRA setup - ${amEmail}`,
-    `powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ${encoded}`,
+    `powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0${psFileName}"`,
+    'echo.',
+    'pause',
     '',
   ].join('\r\n');
-  return { cmd, ps, encoded };
+  return { cmd, ps, psFileName };
 }
 
 function parseArgs(argv) {
@@ -73,14 +81,19 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     }
     token = fs.readFileSync(tokenFile, 'utf8').trim();
   }
-  const { cmd } = buildInstaller({ amEmail, token, url, name: typeof args.name === 'string' ? args.name : undefined });
+  const { cmd, ps, psFileName } = buildInstaller({ amEmail, token, url, name: typeof args.name === 'string' ? args.name : undefined });
   const outDir = path.resolve('.tokens');
   fs.mkdirSync(outDir, { recursive: true, mode: 0o700 });
   const slug = amEmail.split('@')[0].replace(/[^a-z0-9]/gi, '') || 'am';
+  // The .ps1 (the actual script) and the .cmd launcher MUST ship together (zip both).
+  const psPath = path.join(outDir, psFileName);
+  fs.writeFileSync(psPath, ps, { mode: 0o600 });
+  fs.chmodSync(psPath, 0o600);
   const outPath = path.join(outDir, `myra-setup-${slug}.cmd`);
   fs.writeFileSync(outPath, cmd, { mode: 0o600 });
   fs.chmodSync(outPath, 0o600);
-  console.log('OK installer written (SECRET — it embeds the bearer token):');
+  console.log('OK installer written (SECRET — embeds the bearer token). Two files, zip BOTH together:');
   console.log(`   ${outPath}`);
-  console.log(`\nSend it to ${amEmail} via 1Password Send (one-time). They double-click it — done.`);
+  console.log(`   ${psPath}`);
+  console.log(`\nSend the zip to ${amEmail} via 1Password Send. They unzip (keep both files together) and double-click the .cmd.`);
 }

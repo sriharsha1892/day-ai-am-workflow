@@ -67,6 +67,7 @@ If a required input is missing, ask only for that input.
 - Freshsales is read-only.
 - Freshsales, Apollo, and Clearout are accessed through the centralized connector runtime; AM packages never contain API keys.
 - **Production Day AI writes and provider calls must go through the hosted worker (`npm run worker:*`).** Local MCP calls and direct provider fetches are dry-run only. If the worker is unreachable, set `runStatus=blocked`, show Red receipt, do not retry locally.
+- A directly-configured `day-ai` MCP server may be present for auth/read only; **never use its write tools** — they bypass the worker's idempotency key, `approvedBy` attribution, and `pendingSync` safety. The installer comments this legacy block out; if you see it, treat it as read context, not a write path.
 - Every Day AI write must carry an idempotency key and an `approvedBy` AM email. Retries reuse the same idempotency key. The worker rejects writes without both.
 - Every shortcut that makes a recommendation or draft must load `workflow/config/myra-context.json` and keep the output grounded in myRA-specific value.
 - Account intake must not create a Day AI Organization until the smart organization match gate has linked, asked, blocked, or cleared creation.

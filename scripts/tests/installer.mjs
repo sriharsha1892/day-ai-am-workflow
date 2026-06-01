@@ -26,6 +26,8 @@ results.push(
     assert.ok(ps.includes('sandbox = "unelevated"'), 'pre-empts the admin-sandbox error');
     assert.ok(ps.includes('mcp_servers.myra'), 'writes the myra MCP server block');
     assert.ok(ps.includes('list_my_accounts'), 'verifies by listing accounts');
+    assert.ok(ps.includes('mcp_servers\\.(?:day-ai|"day-ai")'), 'ships the legacy day-ai neutralizer regex (Day AI SoR by default)');
+    assert.ok(ps.includes('legacy direct Day AI MCP disabled'), 'stamps the disabled note when commenting the legacy block');
     assert.ok(!ps.includes('{{'), 'no unresolved template placeholders');
   }),
 );

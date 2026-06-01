@@ -22,3 +22,5 @@ This issues the token (**live instantly — no redeploy**) and writes `.tokens/m
 If a corporate machine blocks self-install, the admin can run the same `.cmd` with the AM over a screenshare — identical result.
 
 > The installer sets `[windows] sandbox = "unelevated"` and merges a `[mcp_servers.myra]` block into `~/.codex/config.toml` (backing up any existing config first), then verifies the token against the worker before the AM ever opens Codex.
+>
+> **Day AI stays system-of-record by default:** the merge also comments out any legacy direct `[mcp_servers.day-ai]` block left by the old `codex mcp add day-ai` onboarding, so the myRA worker is the *only* path to Day AI — every write goes through the worker's idempotency key, `approvedBy` attribution, and pending-sync. It comments (not deletes) the block for auditability and is idempotent on re-run.

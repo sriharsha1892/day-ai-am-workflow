@@ -49,7 +49,10 @@ function createRedisBackend(url, token) {
     async recordIdempotency(key, value) {
       const domain = extractDomain(key, value);
       const payload = JSON.stringify(value);
-      // Pipeline: set the value with TTL and add the key to the account's set.
+      // Pipeline: set the value with TTL and add the key to the account's set. NOTE (concurrency,
+      // 2026-06-01 decision = defer): this is a plain set, not SETNX. Safe under the pilot's
+      // single-writer-per-AM model (one AM owns an account at a time). If two AMs ever write the SAME
+      // idempotency key concurrently, last-write-wins; revisit with compare-and-set if that becomes real.
       await Promise.all([
         redis.set(`idem:${key}`, payload, { ex: IDEM_TTL_SECONDS }),
         domain ? redis.sadd(`account-keys:${domain}`, key) : Promise.resolve(),

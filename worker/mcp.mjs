@@ -181,7 +181,9 @@ function inferRemedy(message) {
 }
 
 function fail(message, extra = {}) {
-  const body = { ok: false, receiptColor: 'red', error: message, remedy: extra.remedy ?? inferRemedy(message), ...extra };
+  // Retryable (transient) vs permanent — so the model can say "works in a minute" vs "skip / fix it".
+  const retryable = /timeout|timed out|unreachable|fetch failed|econn|503|429|rate|temporarily/i.test(String(message));
+  const body = { ok: false, receiptColor: 'red', error: message, remedy: extra.remedy ?? inferRemedy(message), retryable, ...extra };
   return {
     content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
     structuredContent: body,

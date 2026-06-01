@@ -8,7 +8,7 @@ import {
 } from './providers/freshsales.mjs';
 import { apolloPeopleSearch } from './providers/apollo.mjs';
 import { writeDayAiContextPage } from './providers/day-ai.mjs';
-import { getIdempotencyForAccount, pendingForAccount } from './store.mjs';
+import { getIdempotencyForAccount, pendingForAccount, queuePendingSync } from './store.mjs';
 import { getOutreachProgress, summarize as summarizeProgress } from './progress.mjs';
 
 const COLOR_RANK = { green: 0, yellow: 1, red: 2 };
@@ -210,11 +210,21 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
       receipt.persistence.dayAiContextPageLink = page.link;
     } catch (error) {
       receipt.summary.color = bump(receipt.summary.color, 'red');
-      receipt.providers.dayAi.pendingSync.push({
+      // Make it RETRYABLE: stamp a real action + canonicalDomain + payload and PERSIST via
+      // queuePendingSync, so retry_all_pending (which needs all three) can actually drain it instead
+      // of leaving the account Red with an undrainable queue. The receipt page is a workspace context
+      // → route the retry through the 'review-context' handler.
+      const entry = {
         attemptedWrite: 'receipt-context-page',
+        action: 'review-context',
+        canonicalDomain,
+        amEmail: approvingAm,
         idempotencyKey: `receipt|${canonicalDomain}|${now.slice(0, 10)}`,
+        payload: { reason: renderMarkdown(receipt), summary: `myRA tour receipt - ${now}` },
         reason: error.message,
-      });
+      };
+      receipt.providers.dayAi.pendingSync.push(entry);
+      await queuePendingSync(entry).catch(() => {});
     }
   }
 

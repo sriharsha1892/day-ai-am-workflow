@@ -8,7 +8,8 @@ const checks = [];
 checks.push(checkFile('AGENTS.md'));
 checks.push(checkFile('workflow/config/packs.json'));
 checks.push(checkCommand('codex', ['--version'], 'Codex CLI'));
-checks.push(checkCommand('codex', ['mcp', 'get', 'day-ai'], 'Day AI MCP'));
+checks.push(checkCommand('codex', ['mcp', 'get', 'myra'], 'myRA worker MCP server'));
+checks.push(checkNoActiveDayAi());
 
 let ok = true;
 for (const check of checks) {
@@ -19,7 +20,7 @@ for (const check of checks) {
 }
 
 if (!ok) {
-  console.log('\nRun npm run setup:codex, then restart Codex or open a fresh session from this repo.');
+  console.log('\nRe-run your myRA one-click installer (myra-setup-<you>.cmd), then restart Codex or open a fresh session.');
   process.exit(1);
 }
 
@@ -29,6 +30,20 @@ function checkFile(path) {
   return {
     label: `${path} exists`,
     ok: fs.existsSync(path),
+  };
+}
+
+// SoR-by-default: the worker must be the ONLY path to Day AI. A direct `day-ai` MCP server bypasses
+// it, so its ABSENCE is the healthy state (the installer comments any legacy block out).
+function checkNoActiveDayAi() {
+  const result = spawnSync('codex', ['mcp', 'get', 'day-ai'], { encoding: 'utf8', stdio: 'pipe' });
+  const present = result.status === 0;
+  return {
+    label: 'No direct day-ai MCP server (Day AI routes through the worker)',
+    ok: !present,
+    detail: present
+      ? 'A direct "day-ai" MCP server is active — it bypasses the worker safeguards. Re-run your myRA installer to disable it.'
+      : undefined,
   };
 }
 

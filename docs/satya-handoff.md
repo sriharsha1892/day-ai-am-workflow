@@ -34,7 +34,7 @@ You do **not** need: Freshsales, Apollo, or Clearout API keys. They live only on
 
 3. **Set up Codex MCP for Day AI** (so Codex can read Day AI directly during dry-run):
    ```bash
-   npm run setup:codex
+   npm run doctor:codex   # setup:codex deprecated — onboard via the hosted worker (one-click installer)
    ```
    Browser opens for Day AI OAuth — sign in with `satya@ask-myra.ai`. This is per-user OAuth for dry-run reads only; production writes route through the worker.
 

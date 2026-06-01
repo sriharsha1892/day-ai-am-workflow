@@ -9,7 +9,7 @@ The pack is intentionally operational: each shortcut has a contract, each write 
 1. Configure this clone's local Codex with Day AI:
 
    ```bash
-   npm run setup:codex
+   npm run doctor:codex   # setup:codex deprecated — onboard via the hosted worker (one-click installer)
    ```
 
 2. Confirm setup:

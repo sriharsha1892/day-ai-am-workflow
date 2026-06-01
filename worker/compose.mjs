@@ -112,6 +112,7 @@ export function composeFirstTouch(input) {
     accountAngleUsed: hook,
     ctaUsed: ctaLine,
     seniorityTier: tier,
+    versionLabel: `${frameKey} · ${preferences.defaultTone ?? 'consultative'}`, // stable recall handle for re-rolls
     toneChecks,
     qualitySummary: qualitySummaryFrom(toneChecks),
     refineHint: "Say 'warmer', 'punchier', or 'shorter' — or edit any line / change the CTA — and I'll redo it.",

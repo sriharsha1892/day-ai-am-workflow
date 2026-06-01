@@ -118,6 +118,12 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
   if (dayAiBlock.status === 'no_data' && accountRecords.length === 0) { color = bump(color, 'yellow'); whyColor.push('No Day AI records saved for this account yet'); }
   if (whyColor.length === 0) whyColor.push('all providers healthy');
 
+  // "What I did NOT do" — derived from real run state (the trust panel), not a canned string.
+  const didNotDo = ['Did not write to Freshsales (read-only).', 'Did not send anything — drafts only.'];
+  if (outreach.contactsWorked === 0) didNotDo.push('Did not verify any emails (Clearout not run for this account).');
+  if (!accountRecords.some((r) => r.type === 'person')) didNotDo.push('Did not create any Day AI contacts.');
+  if (dayAiBlock.pendingSync.length > 0) didNotDo.push(`Did not finish ${dayAiBlock.pendingSync.length} Day AI write(s) — pending sync.`);
+
   // 5. Narrative + next action.
   const narrative = renderNarrative({
     displayName,
@@ -141,6 +147,7 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
     summary: {
       color,
       whyColor,
+      didNotDo,
       headline: `${color.charAt(0).toUpperCase()}${color.slice(1)} - ${displayName ?? canonicalDomain}.`,
       narrative,
       nextAction,

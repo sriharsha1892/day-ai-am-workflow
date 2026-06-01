@@ -12,7 +12,7 @@ const results = [];
 results.push(
   await test('org-create: properties under standardProperties; id = domain', () => {
     const a = WRITE_HANDLERS['org-create'].args({ canonicalDomain: 'itc.in', accountName: 'ITC Limited' });
-    assert.equal(a.objectType, 'Organization');
+    assert.equal(a.objectType, 'native_organization');
     assert.equal(a.isCreating, true);
     assert.equal(a.standardProperties?.domain, 'itc.in');
     assert.equal(a.standardProperties?.name, 'ITC Limited');
@@ -25,7 +25,7 @@ results.push(
 results.push(
   await test('person-create: objectType Person + standardProperties', () => {
     const a = WRITE_HANDLERS['person-create'].args({ candidate: { email: 'a@b.com', name: 'Ann Bee', title: 'VP' } });
-    assert.equal(a.objectType, 'Person');
+    assert.equal(a.objectType, 'native_contact');
     assert.equal(a.standardProperties?.email, 'a@b.com');
     assert.equal(a.standardProperties?.jobTitle, 'VP');
     assert.equal(a.email, undefined, 'no top-level email');

@@ -199,7 +199,7 @@ export const WRITE_HANDLERS = {
     tool: 'create_or_update_person_organization',
     args: (p) => ({
       isCreating: true,
-      objectType: 'Organization',
+      objectType: 'native_organization', // live enum is native_organization|native_contact (NOT 'Organization')
       objectId: p.canonicalDomain,
       standardProperties: { domain: p.canonicalDomain, name: p.accountName ?? p.canonicalDomain },
     }),
@@ -240,7 +240,7 @@ export const WRITE_HANDLERS = {
       const candidate = p.candidate ?? p;
       return {
         isCreating: true,
-        objectType: 'Person',
+        objectType: 'native_contact', // live enum is native_organization|native_contact (NOT 'Person')
         standardProperties: {
           email: candidate.email,
           firstName: candidate.firstName ?? candidate.name?.split(' ')[0],

@@ -250,7 +250,7 @@ export function interpret(toolName, result, config) {
 
   const ran = `${toolCfg.label} (${toolCfg.role})`;
 
-  const block = { badge: toolCfg.badge, label: toolCfg.label, role: toolCfg.role, ran, found, means, source, confidence: level };
+  const block = { badge: toolCfg.badge, label: toolCfg.label, role: toolCfg.role, ran, found, means, source, confidence: level, confidenceReason: toolCfg.confidence?.cueNote?.[level] ?? null };
   if (glyph) block.glyph = glyph;
 
   const groups = groupContacts(toolName, result, cfg);

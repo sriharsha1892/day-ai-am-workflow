@@ -100,14 +100,17 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
       : `${accountRecords.length} Day AI record(s) saved for this account.`,
   };
 
-  // 4. Color is worst of all provider statuses + pending sync.
+  // 4. Color is worst of all provider statuses + pending sync. whyColor = the reasons that fired,
+  // in plain English (the "why is this Yellow/Red?" UX).
   let color = 'green';
-  if (freshsalesBlock.duplicateRisk === 'high') color = bump(color, 'yellow');
-  if (apolloBlock.status === 'no_data') color = bump(color, 'yellow');
-  if (apolloBlock.status === 'failed') color = bump(color, 'red');
-  if (freshsalesBlock.status === 'failed') color = bump(color, 'red');
-  if (dayAiBlock.pendingSync.length > 0) color = bump(color, 'red');
-  if (dayAiBlock.status === 'no_data' && accountRecords.length === 0) color = bump(color, 'yellow');
+  const whyColor = [];
+  if (freshsalesBlock.duplicateRisk === 'high') { color = bump(color, 'yellow'); whyColor.push('Freshsales duplicate risk is high'); }
+  if (apolloBlock.status === 'no_data') { color = bump(color, 'yellow'); whyColor.push('Apollo found no candidates for this filter'); }
+  if (apolloBlock.status === 'failed') { color = bump(color, 'red'); whyColor.push('Apollo was unreachable'); }
+  if (freshsalesBlock.status === 'failed') { color = bump(color, 'red'); whyColor.push('Freshsales was unreachable — duplicate check incomplete'); }
+  if (dayAiBlock.pendingSync.length > 0) { color = bump(color, 'red'); whyColor.push(`${dayAiBlock.pendingSync.length} Day AI write(s) pending sync — run retry_all_pending`); }
+  if (dayAiBlock.status === 'no_data' && accountRecords.length === 0) { color = bump(color, 'yellow'); whyColor.push('No Day AI records saved for this account yet'); }
+  if (whyColor.length === 0) whyColor.push('all providers healthy');
 
   // 5. Narrative + next action.
   const narrative = renderNarrative({
@@ -131,6 +134,7 @@ export async function buildReceipt({ canonicalDomain, displayName, approvingAm, 
     },
     summary: {
       color,
+      whyColor,
       headline: `${color.charAt(0).toUpperCase()}${color.slice(1)} - ${displayName ?? canonicalDomain}.`,
       narrative,
       nextAction,

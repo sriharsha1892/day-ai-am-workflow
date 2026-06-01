@@ -10,6 +10,7 @@
 import * as kv from './kv.mjs';
 import { listAllAssignments } from './accounts.mjs';
 import { listTourDomains, getTourState } from './state.mjs';
+import { getThresholds } from './admin-config.mjs';
 
 const lastSeenKey = (am) => `last-seen:${am}`;
 
@@ -102,29 +103,37 @@ export async function teamBrief({ windowDays = 7 } = {}) {
   };
 }
 
-export async function assignmentHealth({ overloadThreshold = 60, staleDays = 14 } = {}) {
+export async function assignmentHealth(opts = {}) {
+  const th = await getThresholds();
+  const overloadThreshold = opts.overloadThreshold ?? th.overloadThreshold;
+  const staleDays = opts.staleDays ?? th.staleDays;
   const all = await listAllAssignments();
   const overloaded = [];
   const staleP1s = [];
   for (const [am, accounts] of Object.entries(all.byAm)) {
-    if (accounts.length > overloadThreshold) overloaded.push({ amEmail: am, count: accounts.length });
+    if (accounts.length > overloadThreshold) {
+      overloaded.push({ amEmail: am, count: accounts.length, nextStep: `Reassign ${accounts.length - overloadThreshold} account(s) off ${am} (assign_accounts).` });
+    }
     for (const a of accounts) {
       if (a.priority === 'P1' && a.canonicalDomain) {
         const st = await getTourState(am, a.canonicalDomain).catch(() => null);
         const last = st?.lastTouchedAt ?? null;
         if (daysAgo(last) > staleDays) {
-          staleP1s.push({ amEmail: am, account: a.accountName, lastTouched: humanAgo(last) });
+          staleP1s.push({ amEmail: am, account: a.accountName, lastTouched: humanAgo(last), nextStep: `Nudge ${am} to work ${a.accountName} (P1, untouched ${humanAgo(last)}).` });
         }
       }
     }
   }
+  // Each blocker carries an actionable next step (the chosen "blockers-with-actions" UX).
+  const conflicts = all.conflicts.map((c) => ({ ...c, nextStep: `Domain ${c.domain} owned by ${c.ams.join(' + ')} — keep one owner (assign_accounts moves it).` }));
   return {
     ok: true,
+    thresholds: { overloadThreshold, staleDays },
     total: all.total,
-    conflicts: all.conflicts,
+    conflicts,
     overloaded,
     staleP1s,
-    healthy: all.conflicts.length === 0 && overloaded.length === 0 && staleP1s.length === 0,
+    healthy: conflicts.length === 0 && overloaded.length === 0 && staleP1s.length === 0,
   };
 }
 

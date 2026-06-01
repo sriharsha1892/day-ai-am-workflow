@@ -39,6 +39,8 @@ import { runWorkContactLoop, runWorkContactsBulk, checkRecentTouch } from './out
 import { recordContactWorked } from './progress.mjs';
 import { interpret } from './render.mjs';
 import { myCredits, teamCredits } from './credits.mjs';
+import { queuePendingSync, allPending, drainPendingByKey } from './store.mjs';
+import { setThresholds } from './admin-config.mjs';
 
 // Local .env loader (no-op on Vercel where env is injected). Mirrors worker/app.mjs.
 for (const candidate of ['worker/.env', '.env.local']) {
@@ -83,6 +85,7 @@ Every in-scope tool result is stamped with an interpretation block (interpretati
 Badges: FS Freshsales · AP Apollo · CO Clearout · DAY Day AI. Use interpretation.confidence as stamped (high/med/low) — do not recompute. If interpretation.glyph is present, show it inline on the verdict.
 The Source line already encodes cache state ("served from cache (0 credits)"), staleness ("refreshed Xh ago", with "add refresh:true to re-pull" once stale), and "needs cost approval — nothing spent yet". Echo those cues; never invent your own. On needsCostApproval, STOP and relay the projected cost; only after the AM approves re-call with confirmSpend:true.
 When interpretation.groups is present, render each group under its own heading, in order: "Existing MI contacts" (Freshsales — people Mordor Intelligence already knows) ABOVE "Net-new (Apollo)" (prospects not yet in MI's CRM). Print each group's rows[] verbatim; NEVER merge the two groups. Show emptyState when a group is empty. The Freshsales row shows "⚠ contacted <relative date>" only when there is a real recent sales touch (a field edit is never a contact). Apollo rows lead "★ Recommended" then "Maybe"; skip Hold unless the AM asks. Present Recommended as a pre-approved batch by name; walk Maybe one at a time.
+On "show details" / "why?": expand interpretation.confidenceReason (why this confidence) and, for a receipt, summary.whyColor (the plain-English reasons it's Yellow/Red) — and briefly state what you did NOT do (did not write to Freshsales; did not merge Freshsales + Apollo; did not send anything). Keep this OFF by default (only on Yellow/Red or when asked).
 
 ## Contact selection (map_contacts / source_new_contacts)
 Present Recommended candidates as a pre-approved batch by name (AM can veto any by name), walk Maybe one at a time, skip Hold unless the AM asks. Numbered selection ("select 1, 3, 7") works at any prompt.
@@ -94,7 +97,7 @@ Resolve the persona/cadence/channel packs, then walk each step's fields in seque
 On the FIRST message of a session, greet the AM by name, call next_resume, and offer their top unfinished account naming what was last done ("Hi Satish — last on ITC Friday: 3 contacts approved. Resume, or start fresh?"). On "bye"/"wrap up"/"done for today", give a brief wrap-up: accounts touched, contacts worked, drafts queued, credits used this month, any pending sync, and the resume suggestion.
 
 ## Account list
-"What are my accounts?" → call list_my_accounts. Render as a COMPACT aligned table (priority · status · account · domain), in the returned order. Map filter intents to args: "my P1s" → priority:'P1'; "ready to intake" → status:'ready_for_intake'; "untouched 7+ days" → untouchedDays:7; "alphabetical" → sort:'name'. (The xlsx is retired.) guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health, team_brief, rollout_status, team_credits.
+"What are my accounts?" → call list_my_accounts. Render as a COMPACT aligned table (priority · status · account · domain), in the returned order. Map filter intents to args: "my P1s" → priority:'P1'; "ready to intake" → status:'ready_for_intake'; "untouched 7+ days" → untouchedDays:7; "alphabetical" → sort:'name'. (The xlsx is retired.) guided-tour and next_resume draw from it. Any AM may assign/reassign via assign_accounts (an account has one owner at a time). Admin/team views: list_all_assignments, assignment_health (blockers carry a nextStep), team_brief, rollout_status, team_credits. set_admin_thresholds tunes overload/stale/low-runway thresholds (no redeploy). For stuck Day AI writes ("fix Day AI" / "retry sync" / "what's stuck"): show_pending_syncs, then retry_all_pending (reuses each idempotency key — never duplicates). If any credits/work result carries a lowBalanceAlert, surface that banner verbatim.
 
 ## Per-contact outreach (work-contact)
 For "work this contact" / "work the next one": call work_contact. It runs email discovery+verification (Apollo+Clearout) and the LinkedIn note prep in parallel, then composes a NON-SALESY, designation-aware first touch (goal: earn ~15 min for a call, never pitch). Repeat touches are cheap — enriched emails (24h) and Clearout verdicts (30d) are cached, so a re-run can cost 0 credits; pass refresh:true only to force a fresh pull.
@@ -357,10 +360,21 @@ export function initializeServer(server) {
         });
         return ok(result, 'dayai_write');
       } catch (e) {
+        // Enqueue for the pending-sync queue so it survives the chat and can be retried later.
+        await queuePendingSync({
+          canonicalDomain: args.canonicalDomain,
+          amEmail: approvingAm,
+          action: args.action,
+          idempotencyKey,
+          payload: args.payload ?? {},
+          reason: e.message,
+          attemptedWrite: args.action,
+          queuedAt: new Date().toISOString(),
+        }).catch(() => {});
         return fail(`dayai_write ${args.action} failed: ${e.message}`, {
           runStatus: 'pending_sync',
           idempotencyKey,
-          retryPrompt: `Retry pending Day AI sync using the same idempotency key (${idempotencyKey}).`,
+          retryPrompt: `Queued — run show_pending_syncs to see it, or retry_all_pending (reuses the idempotency key ${idempotencyKey}, never duplicates).`,
         });
       }
     },
@@ -851,6 +865,79 @@ export function initializeServer(server) {
         return ok(await teamCredits());
       } catch (e) {
         return fail(`team_credits failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'show_pending_syncs',
+    {
+      description: "List the signed-in AM's failed Day AI writes awaiting retry (the pending-sync queue). Read-only.",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      try {
+        const am = amEmailFrom(extra);
+        const mine = (await allPending()).filter((e) => !e.amEmail || e.amEmail === am);
+        return ok({ ok: true, count: mine.length, pending: mine });
+      } catch (e) {
+        return fail(`show_pending_syncs failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'retry_all_pending',
+    {
+      description: "Retry all of the signed-in AM's pending Day AI writes, reusing each stored idempotency key (never duplicates). Drains the ones that succeed.",
+      inputSchema: {},
+    },
+    async (_args, extra) => {
+      const am = amEmailFrom(extra);
+      try {
+        const mine = (await allPending()).filter(
+          (e) => (!e.amEmail || e.amEmail === am) && e.action && e.canonicalDomain && e.idempotencyKey,
+        );
+        const results = [];
+        for (const e of mine) {
+          try {
+            const r = await dayAiWrite({
+              action: e.action,
+              canonicalDomain: e.canonicalDomain,
+              idempotencyKey: e.idempotencyKey,
+              retry: true,
+              approvingAm: am,
+              dayAiToken: dayAiTokenFrom(extra),
+              ...(e.payload ?? {}),
+            });
+            await drainPendingByKey(e.idempotencyKey).catch(() => {});
+            results.push({ idempotencyKey: e.idempotencyKey, action: e.action, ok: true, id: r.id });
+          } catch (err) {
+            results.push({ idempotencyKey: e.idempotencyKey, action: e.action, ok: false, error: err.message });
+          }
+        }
+        return ok({ ok: true, attempted: results.length, retried: results.filter((r) => r.ok).length, results });
+      } catch (e) {
+        return fail(`retry_all_pending failed: ${e.message}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    'set_admin_thresholds',
+    {
+      description: 'Tune admin thresholds in KV (no redeploy): overloadThreshold (accounts/AM), staleDays (P1 untouched), lowRunwayDays (Clearout low-balance alert). Read by assignment_health + the credit alert.',
+      inputSchema: {
+        overloadThreshold: z.number().optional(),
+        staleDays: z.number().optional(),
+        lowRunwayDays: z.number().optional(),
+      },
+    },
+    async (args, extra) => {
+      try {
+        return ok({ ok: true, thresholds: await setThresholds(args), updatedBy: amEmailFrom(extra) });
+      } catch (e) {
+        return fail(`set_admin_thresholds failed: ${e.message}`);
       }
     },
   );

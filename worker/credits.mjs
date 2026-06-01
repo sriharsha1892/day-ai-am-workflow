@@ -4,6 +4,23 @@
 
 import * as kv from './kv.mjs';
 import { peek as cachePeek, putEntry as cachePutEntry } from './cache.mjs';
+import { getThresholds } from './admin-config.mjs';
+
+// Clearout runway in days at this month's pace; Infinity when balance unknown or no usage yet.
+function runwayDays(usedThisMonth, remaining) {
+  if (remaining == null || !usedThisMonth) return Infinity;
+  const dayOfMonth = new Date().getUTCDate();
+  const perDay = usedThisMonth / Math.max(dayOfMonth, 1);
+  return perDay > 0 ? remaining / perDay : Infinity;
+}
+
+async function clearoutLowBalanceAlert(usedThisMonth, remaining) {
+  const { lowRunwayDays } = await getThresholds();
+  const days = runwayDays(usedThisMonth, remaining);
+  return days < lowRunwayDays
+    ? `⚠ Clearout runway ~${Math.round(days)}d (under the ${lowRunwayDays}d floor) — verify only high-value contacts until it's topped up.`
+    : null;
+}
 
 const usageKey = (am, provider, ym) => `credit-usage:${am}:${provider}:${ym}`;
 
@@ -73,6 +90,7 @@ export async function myCredits(amEmail) {
     month: ym,
     apollo: { usedThisMonth: apolloUsed, remaining: null, note: 'Apollo balance not exposed by API — spend tracked, runway n/a' },
     clearout: { usedThisMonth: clearoutUsed, remaining: clearoutRemaining },
+    lowBalanceAlert: await clearoutLowBalanceAlert(clearoutUsed, clearoutRemaining),
   };
 }
 
@@ -95,6 +113,7 @@ export async function teamCredits() {
     month: ym,
     apollo: { usedThisMonth: apolloTotal },
     clearout: { usedThisMonth: clearoutTotal, remaining: clearoutRemaining, runway: runwayWords(clearoutTotal, clearoutRemaining) },
+    lowBalanceAlert: await clearoutLowBalanceAlert(clearoutTotal, clearoutRemaining),
     perAm,
   };
 }

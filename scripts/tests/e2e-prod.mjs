@@ -158,14 +158,14 @@ async function main() {
     await send('notifications/initialized', {}, true);
   }
 
-  // 5. tools/list → 28 tools (count + a few expected names).
+  // 5. tools/list → 31 tools (count + a few expected names).
   {
     const r = await send('tools/list', {});
     const tools = r.json?.result?.tools ?? [];
     const names = new Set(tools.map((t) => t.name));
     const expected = ['resolve_identity', 'apollo_search', 'list_my_accounts', 'build_receipt', 'compose_first_touch'];
     const haveExpected = expected.every((n) => names.has(n));
-    check('05a tools/list: exactly 28 tools', tools.length === 28, `got ${tools.length}`);
+    check('05a tools/list: exactly 31 tools', tools.length === 31, `got ${tools.length}`);
     check('05b tools/list: expected tool names present', haveExpected, expected.join(', '));
   }
 

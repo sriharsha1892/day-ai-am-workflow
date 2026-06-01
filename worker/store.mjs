@@ -104,6 +104,19 @@ function createRedisBackend(url, token) {
         }
       } while (nextCursor !== '0');
     },
+    async allPending() {
+      const out = [];
+      let nextCursor = '0';
+      do {
+        const result = await redis.scan(nextCursor, { match: 'pending:*', count: 100 });
+        nextCursor = String(result[0] ?? '0');
+        for (const key of result[1] ?? []) {
+          const entries = await redis.lrange(key, 0, -1);
+          for (const raw of entries) out.push(typeof raw === 'string' ? JSON.parse(raw) : raw);
+        }
+      } while (nextCursor !== '0');
+      return out;
+    },
   };
 }
 
@@ -178,6 +191,9 @@ function createDiskBackend() {
       pending = pending.filter((e) => e.idempotencyKey !== idempotencyKey);
       await flushPending();
     },
+    async allPending() {
+      return [...pending];
+    },
   };
 }
 
@@ -212,6 +228,10 @@ export async function pendingForAccount(canonicalDomain) {
 
 export async function drainPendingByKey(idempotencyKey) {
   return pickBackend().drainPendingByKey(idempotencyKey);
+}
+
+export async function allPending() {
+  return pickBackend().allPending();
 }
 
 export function backendKind() {

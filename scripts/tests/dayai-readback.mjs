@@ -62,5 +62,30 @@ results.push(
   }),
 );
 
+results.push(
+  await test('confirmsWithoutId set on string-confirming writes (action/draft/context), NOT on id-bearing ones', () => {
+    for (const a of ['action-create', 'draft-create', 'review-context']) {
+      assert.equal(WRITE_HANDLERS[a].confirmsWithoutId, true, `${a} is confirmsWithoutId`);
+    }
+    for (const a of ['org-create', 'opportunity-create', 'person-create']) {
+      assert.ok(!WRITE_HANDLERS[a].confirmsWithoutId, `${a} stays strict (id-bearing / domain-keyed)`);
+    }
+    assert.equal(typeof WRITE_HANDLERS['action-create'].readBack, 'function', 'action-create has an advisory readBack');
+  }),
+);
+
+results.push(
+  await test('review-context body resolves from any caller key; empty/missing body throws (no plainTextValue:"")', () => {
+    const h = WRITE_HANDLERS['review-context'];
+    for (const key of ['content', 'text', 'note', 'reason', 'bodyMarkdown', 'markdown', 'plainTextValue']) {
+      const a = h.args({ canonicalDomain: 'acme.com', [key]: '  hello  ' });
+      assert.equal(a.plainTextValue, 'hello', `body resolves from payload.${key} (trimmed)`);
+      assert.equal(a.objectId, 'acme.com', 'attached to the org by domain');
+    }
+    assert.throws(() => h.args({ canonicalDomain: 'acme.com' }), /non-empty body/, 'missing body throws BEFORE sending');
+    assert.throws(() => h.args({ canonicalDomain: 'acme.com', content: '   ' }), /non-empty body/, 'whitespace-only body throws');
+  }),
+);
+
 const failed = results.filter((r) => !r.ok);
 process.exit(failed.length === 0 ? 0 : 1);

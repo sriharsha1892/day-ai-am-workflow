@@ -221,6 +221,22 @@ function idFromResponse(parsed) {
   );
 }
 
+// Several create_or_update_* Day AI tools (action / draft / workspace-context) legitimately return a
+// human-readable confirmation STRING with no id JSON. For handlers flagged `confirmsWithoutId` we
+// accept a genuine success — a non-empty parsed body that does NOT read as a failure (isError is
+// guarded separately) — rather than parking it forever as "no record id returned".
+function hasContent(parsed) {
+  if (!parsed) return false;
+  if (typeof parsed._raw === 'string') return parsed._raw.trim().length > 0;
+  return Object.keys(parsed).length > 0;
+}
+function looksLikeFailure(parsed) {
+  if (!parsed) return false;
+  if (parsed.success === false || parsed.error || parsed.errors) return true;
+  const raw = typeof parsed._raw === 'string' ? parsed._raw : '';
+  return /\b(error|failed|invalid|denied|unauthor|not found|rejected)\b/i.test(raw);
+}
+
 // Action verb -> { tool, args(payload), type, extractRecord }. args() shapes our internal payload
 // into the EXACT arguments the live Day AI MCP tool expects (verified against day-ai-sdk SCHEMA.md
 // + live tools/list, 2026-05-29): every create_or_update_* write takes its properties under
@@ -349,6 +365,7 @@ export const WRITE_HANDLERS = {
   },
   'action-create': {
     tool: 'create_or_update_action',
+    confirmsWithoutId: true, // create_or_update_action returns a confirmation string, no id JSON
     // Live schema: ownerEmail / dueDate / people[] / domains[] / assignedToAssistant — NOT
     // assigneeEmail / dueAt / relatedContactEmail / relatedOpportunityDomain / channel.
     args: (p) => ({
@@ -364,14 +381,40 @@ export const WRITE_HANDLERS = {
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id, // no fabrication -> unconfirmed action queues a pendingSync
+        id, // no id echoed -> readBack tries to recover it; else the gate stores a pending-action token
         name: parsed?.title ?? p.summary ?? p.title ?? 'Action',
         link: id ? `${baseUrl()}/actions/${id}` : null,
       };
     },
+    // Advisory: actions have no natural key, so after an id-less success try a best-effort search to
+    // recover the real objectId. Bind ONLY on an unambiguous single owner+title match; any miss or
+    // ambiguity returns null (gate then stores the namespaced token). Never re-throws. If the
+    // objectType is wrong it simply finds nothing -> safe degrade to the pending-action token.
+    async readBack(p, dayAiToken) {
+      if (!credsReady()) return null;
+      const title = p.summary ?? p.title ?? 'Follow-up';
+      const owner = p.assigneeEmail ?? p.ownerEmail ?? p.approvingAm;
+      try {
+        const parsed = parseMcpResult(
+          await mcpCallTool(
+            'search_objects',
+            { queries: [{ objectType: 'native_action', where: { propertyId: 'title', operator: 'eq', value: title } }], propertiesToReturn: '*' },
+            dayAiToken,
+          ),
+        );
+        const results = parsed?.native_action?.results ?? [];
+        const owned = owner ? results.filter((r) => (r.ownerEmail ?? r.properties?.ownerEmail ?? r.standardProperties?.ownerEmail) === owner) : results;
+        const hit = owned.length === 1 ? owned[0] : null;
+        const id = hit?.objectId ?? hit?.id ?? null;
+        return id ? { id, link: `${baseUrl()}/actions/${id}` } : null;
+      } catch {
+        return null;
+      }
+    },
   },
   'draft-create': {
     tool: 'create_email_draft',
+    confirmsWithoutId: true, // create_email_draft returns a confirmation string, no id JSON
     // Live schema: `description` is REQUIRED; `to` is an ARRAY; no relatedOpportunityDomain field.
     args: (p) => ({
       description: p.description ?? (p.subject ? `First-touch: ${p.subject}` : 'First-touch outreach draft'),
@@ -391,22 +434,30 @@ export const WRITE_HANDLERS = {
   },
   'review-context': {
     tool: 'create_or_update_workspace_context',
-    // Live schema: mode + plainTextValue required; attach to the org via objectType+objectId
-    // (NOT title/content/relatedOrganizationDomain).
-    args: (p) => ({
-      mode: 'create',
-      plainTextValue: p.reason ?? p.bodyMarkdown ?? p.content ?? '',
-      title: p.summary ?? p.title ?? 'Review required',
-      summary: p.summary ?? p.title,
-      attachmentType: 'object',
-      objectType: 'native_organization',
-      objectId: p.canonicalDomain,
-    }),
+    // Live schema: mode + plainTextValue (REQUIRED, min 1 char) + attach to the org via
+    // objectType+objectId. The body arrives from the LLM under varying keys — resolve from any
+    // reasonable one and FAIL LOUDLY if truly empty (never send plainTextValue:'' -> Day AI Zod reject).
+    confirmsWithoutId: true, // create_or_update_workspace_context returns a confirmation string, no id
+    args: (p) => {
+      const body = p.plainTextValue ?? p.reason ?? p.bodyMarkdown ?? p.markdown ?? p.body ?? p.content ?? p.text ?? p.note ?? p.description;
+      if (!body || !String(body).trim()) {
+        throw new Error(`review-context needs non-empty body text (set one of: content/reason/bodyMarkdown/text/markdown/note). Got payload keys: ${Object.keys(p).join(', ') || '(none)'}`);
+      }
+      return {
+        mode: 'create',
+        plainTextValue: String(body).trim(),
+        title: p.summary ?? p.title ?? 'Review required',
+        summary: p.summary ?? p.title,
+        attachmentType: 'object',
+        objectType: 'native_organization',
+        objectId: p.canonicalDomain,
+      };
+    },
     type: 'page',
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
       return {
-        id, // no fabrication -> unconfirmed review-context queues a pendingSync
+        id, // no id echoed -> the confirmsWithoutId gate records a namespaced pending-page token
         name: parsed?.title ?? p.summary ?? 'Review context',
         link: id ? `${baseUrl()}/contexts/${id}` : null,
       };
@@ -437,6 +488,7 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
   let record;
   let type;
   let sharedFallback = false;
+  let parsedBody = null;
   if (handler.run) {
     const out = await handler.run(payload);
     record = out.record;
@@ -453,17 +505,27 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
       throw new Error(`Day AI ${handler.tool} error: ${String(msg).slice(0, 300)}`);
     }
     sharedFallback = Boolean(result?.__sharedFallback);
-    const parsed = parseMcpResult(result);
-    record = handler.extractRecord(parsed, payload);
+    parsedBody = parseMcpResult(result);
+    record = handler.extractRecord(parsedBody, payload);
     type = handler.type;
   }
 
-  // Confirmation gate: a write is a success ONLY if Day AI confirmed it — a real echoed objectId,
-  // or a domain-keyed org id (the domain IS the org objectId). No id => the write was not confirmed
-  // (soft validation drop / tier gating / schema drift) => throw so the caller queues a pendingSync.
-  // We never fabricate a synthetic id and record a fake success with a dead link.
+  // Confirmation gate. Confirmed when Day AI echoes a real objectId or a domain-keyed org id.
+  // Some create_or_update_* tools (action/draft/context) legitimately return only a confirmation
+  // STRING with no id; for those (handler.confirmsWithoutId) accept a genuine success — isError was
+  // already guarded above, the parsed body is non-empty, and it doesn't read as a soft failure —
+  // then (advisory) try a read-back to recover the real id, else store a NAMESPACED local correlation
+  // token (never a Day AI id/URL) so retry stops re-issuing. Still throw for id-bearing handlers
+  // (org/opportunity/person) with no id, or when the response reads as a failure. Never fabricate.
   if (!record?.id) {
-    throw new Error(`Day AI ${handler.tool ?? action} write not confirmed (no record id returned) — queued for retry`);
+    if (handler.confirmsWithoutId && hasContent(parsedBody) && !looksLikeFailure(parsedBody)) {
+      const recovered = handler.readBack ? await handler.readBack(payload, dayAiToken).catch(() => null) : null;
+      record = recovered?.id
+        ? { ...record, id: recovered.id, link: recovered.link ?? null }
+        : { ...record, id: `pending-${type}:${idempotencyKey}`, link: null };
+    } else {
+      throw new Error(`Day AI ${handler.tool ?? action} write not confirmed (no record id returned) — queued for retry`);
+    }
   }
 
   const persisted = {
@@ -492,9 +554,12 @@ export async function dayAiWrite({ action, approvingAm, canonicalDomain, idempot
 
 export async function writeDayAiContextPage({ canonicalDomain, organizationId, title, bodyMarkdown, approvingAm }) {
   if (!credsReady()) throw new Error('Day AI credentials missing');
+  if (!bodyMarkdown || !String(bodyMarkdown).trim()) {
+    throw new Error('writeDayAiContextPage: empty body — refusing to send plainTextValue:"" to Day AI');
+  }
   const result = await mcpCallTool('create_or_update_workspace_context', {
     mode: 'create',
-    plainTextValue: bodyMarkdown,
+    plainTextValue: String(bodyMarkdown),
     title,
     summary: title,
     attachmentType: 'object',

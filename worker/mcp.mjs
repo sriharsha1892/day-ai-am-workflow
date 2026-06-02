@@ -338,7 +338,7 @@ export function initializeServer(server) {
     'dayai_write',
     {
       description:
-        'Production Day AI write. action one of: org-link | org-create | opportunity-create | person-dedupe-check | person-create | action-create | draft-create | review-context. Requires AM approval upstream. Idempotency key reused on retry — never creates duplicates. Attributed to the signed-in AM.',
+        'Production Day AI write. action one of: org-link | org-create | opportunity-create | person-dedupe-check | person-create | action-create | draft-create | review-context. Requires AM approval upstream. Idempotency key reused on retry — never creates duplicates. Attributed to the signed-in AM. For review-context, the note body MUST be in payload.content (with a short payload.summary) — an empty body is rejected.',
       inputSchema: {
         action: z.enum([
           'org-link',
@@ -354,7 +354,10 @@ export function initializeServer(server) {
         idempotencyKey: z.string().optional(),
         contactKey: z.string().optional(),
         retry: z.boolean().optional(),
-        payload: z.record(z.any()).optional(),
+        payload: z
+          .object({ content: z.string().optional(), reason: z.string().optional(), summary: z.string().optional() })
+          .passthrough()
+          .optional(),
       },
     },
     async (args, extra) => {

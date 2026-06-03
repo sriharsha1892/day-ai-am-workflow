@@ -270,17 +270,27 @@ export const WRITE_HANDLERS = {
   },
   'opportunity-create': {
     tool: 'create_or_update_opportunity',
-    args: (p) => ({
-      isCreating: true,
-      standardProperties: {
-        title: p.title ?? `${p.canonicalDomain} - Researching`,
-        stageId: p.stageId,
-        domain: p.canonicalDomain,
-        ownerEmail: p.ownerEmail ?? p.approvingAm,
-        expectedRevenue: p.expectedRevenue,
-        expectedCloseDate: p.expectedCloseDate,
-      },
-    }),
+    args: (p) => {
+      const out = {
+        isCreating: true,
+        standardProperties: {
+          title: p.title ?? `${p.canonicalDomain} - Researching`,
+          stageId: p.stageId,
+          domain: p.canonicalDomain,
+          ownerEmail: p.ownerEmail ?? p.approvingAm,
+          expectedRevenue: p.expectedRevenue,
+          expectedCloseDate: p.expectedCloseDate,
+        },
+      };
+      // Pass-through custom properties. Caller is responsible for using the
+      // workspace property + option UUIDs from templates/day-ai-workspace-ids.json.
+      // Day.ai MCP shape: [{ propertyId: "uuid", value: <string|number|boolean|array|null>, reasoning?: "..." }]
+      // For picklist properties, `value` MUST be the option ID (UUID), not the display name.
+      if (Array.isArray(p.customProperties) && p.customProperties.length) {
+        out.customProperties = p.customProperties;
+      }
+      return out;
+    },
     type: 'opportunity',
     extractRecord: (parsed, p) => {
       const id = idFromResponse(parsed);
@@ -290,6 +300,32 @@ export const WRITE_HANDLERS = {
         link: id ? `${baseUrl()}/opportunities/${id}` : null,
       };
     },
+  },
+  'opportunity-update-stage': {
+    tool: 'create_or_update_opportunity',
+    // stage transitions return a confirmation string without echoing the id JSON — same pattern
+    // as action-create. We know the id (caller passed opportunityId), so extractRecord can return
+    // it deterministically without a read-back.
+    confirmsWithoutId: true,
+    args: (p) => {
+      if (!p.opportunityId) throw new Error('opportunity-update-stage requires opportunityId');
+      if (!p.stageId) throw new Error('opportunity-update-stage requires stageId (target stage UUID)');
+      const out = {
+        isCreating: false,
+        objectId: p.opportunityId,
+        standardProperties: { stageId: p.stageId },
+      };
+      if (Array.isArray(p.customProperties) && p.customProperties.length) {
+        out.customProperties = p.customProperties;
+      }
+      return out;
+    },
+    type: 'opportunity',
+    extractRecord: (_parsed, p) => ({
+      id: p.opportunityId, // we passed it in — confirmed by the call returning without error
+      name: `Opportunity ${String(p.opportunityId).slice(0, 8)}`,
+      link: `${baseUrl()}/opportunities/${p.opportunityId}`,
+    }),
   },
   'person-create': {
     tool: 'create_or_update_person_organization',

@@ -1,0 +1,110 @@
+{
+  "_comment": "Day.ai workspace IDs for ask-myra.ai. Source of truth for all Day.ai writes. Both pipelines + 14 stages confirmed via MCP on 2026-06-03.",
+  "workspaceId": "be5dcc29-7973-43eb-999d-a59e40ab29e7",
+  "workspaceDomain": "ask-myra.ai",
+  "assistantId": "ea2e9415-ab7a-47fe-9b89-d81399d10f01",
+  "pipelines": {
+    "newBusinessOutbound": {
+      "id": "d5cecc36-4757-4e60-8d66-900ef7a475af",
+      "name": "New Business – Outbound",
+      "type": "NEW_CUSTOMER",
+      "stages": {
+        "connection":       "557bc92f-216f-4812-a622-18ce27a9d0a3",
+        "discovery":        "3bd23208-e9b5-4264-99ba-d3cbc158f7fb",
+        "demoWalkthrough":  "d95c83f1-5ec6-4ced-85bb-56f997c14a0f",
+        "trialActive":      "dea39fa7-4a45-48f3-acd7-815f045bab20",
+        "negotiation":      "276360a5-8489-4fb3-9218-51e6af82f6cf",
+        "closedWon":        "5ce9e472-1da8-493d-81e0-cc8edad90ee8",
+        "closedLost":       "71986b2c-da91-4e52-b3a3-d95f529c1f7c"
+      }
+    },
+    "expansion": {
+      "id": "edd86bbc-fd6c-4307-993f-6d1a6ba968aa",
+      "name": "Expansion",
+      "type": "EXISTING_CUSTOMER",
+      "stages": {
+        "trialToPaid":      "cd9e5f34-f38b-49b1-98da-fe11745ea3ba",
+        "adoption":         "51f9d088-8883-408a-af1f-57d26553c6e1",
+        "upsellIdentified": "6380d25f-89e4-4544-8aed-35880d200c22",
+        "renewalHold":      "5f2c7f52-73e4-4cfa-84a4-3636f907d701",
+        "closedWon":        "7ece9a16-d182-48ad-addd-7325469d1d69",
+        "closedLost":       "f6dafd45-672d-42f5-8562-dc2657278049",
+        "churned":          "fd9bee04-b96b-4bd3-8386-38bace3f7528"
+      }
+    }
+  },
+  "customProperties": {
+    "pitchedSince": {
+      "id": "aa29b393-4c61-4aa4-8b09-eeeb2e809b99",
+      "type": "datetime"
+    },
+    "trialActivity": {
+      "id": "35078f53-b6a6-43b4-b7b5-b16159140ae4",
+      "type": "boolean"
+    },
+    "icpTier": {
+      "id": "ab7a841e-a0a5-43c9-a742-91d3dac0061e",
+      "type": "picklist",
+      "options": {
+        "tier1": "2298eba4-2e41-48f1-961c-59df5223dcbb",
+        "tier2": "e5c96f37-03f7-48d9-bc20-9931a7464b5a",
+        "tier3": "5a79ef9a-b267-48cf-a06a-b8fd0d457775"
+      }
+    },
+    "lastOutreachChannel": {
+      "id": "9d9aa3cd-98e6-4d6e-b84e-5a4bb8b844b0",
+      "type": "picklist",
+      "options": {
+        "email":    "54bc0cbd-f934-418a-b5f6-8076d1fb2088",
+        "call":     "842210fd-51dd-4ddd-ab8c-52d210e92453",
+        "linkedin": "7124adc0-dde8-4fde-ab32-8c2cc486b27b",
+        "inPerson": "3854c9b4-b01f-41b7-833e-f85f58569f10",
+        "none":     "046f339e-07b0-4745-8363-0047e0898bea"
+      }
+    },
+    "amOwnerSource": {
+      "id": "3bef92dd-a429-4f2a-b72c-8dc01e37473f",
+      "type": "picklist",
+      "options": {
+        "harsha":     "55ac4794-41f0-4cd8-8bc0-208d2bf0d953",
+        "satya":      "dbb939b4-b1bc-45c0-b20b-b803388b30de",
+        "satish":     "b909a4e5-5392-47e7-98fc-e1e02924fdb3",
+        "sudeshana":  "5b817b1a-9911-42ed-ba71-6364c43d46f3",
+        "kirandeep":  "125c4fb6-f9ca-47a6-aec5-3841d593017c",
+        "vijay":      "a1afcb34-3d0e-408f-8fb6-4678e7db4d16",
+        "nikita":     "b559627c-6829-4b86-94a0-23dd28bcb3a3"
+      }
+    }
+  },
+  "emailTemplates": {
+    "firstTouchCold":     { "templateId": "63247732-d84d-4c42-a82b-94f12999a697", "pageId": "31d79845-496f-4d34-af35-28a7dc494f3e", "title": "First-touch (cold outbound)" },
+    "trialFollowup48h":   { "templateId": "dc4c9b9e-81d1-4d9b-b1ae-c71d622403c9", "pageId": "863764e2-5e04-4bd1-a3dd-86ddcf82f33d", "title": "Trial follow-up (48h)" },
+    "demoConfirmation":   { "templateId": "87af3da1-9608-4e3c-b58f-58ed505d2e46", "pageId": "b834f3ce-747c-4a2b-8fe7-159aa01409f1", "title": "Demo confirmation" },
+    "renewalNudge30d":    { "templateId": "c1317e02-9fe3-4df3-8f4c-69c06fced015", "pageId": "745dfac3-5b0a-4d3d-b9aa-309cb3f04846", "title": "Renewal nudge (30 days)" }
+  },
+  "pages": {
+    "operatingManual": { "id": "85af0a44-b23b-4ac8-ae7e-f1aaeccc3017", "title": "myRA AM Operating Manual", "publishedToWorkspace": true }
+  },
+  "views": {
+    "allAccountsUniverse":     { "id": "14961e69-7cd6-40e3-9079-cb766e1d1ffd", "objectType": "native_organization", "title": "All Accounts (Universe)" },
+    "demosThisWeek":           { "id": "91ea00f7-6f81-4bf3-b2ec-1c132dfe3528", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Demos This Week" },
+    "trialActiveNeedsAttention": { "id": "28670a7e-1d55-49cc-8f28-966ead540250", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Trial Active — needs attention" },
+    "hotThisWeek":             { "id": "f545a23b-a334-4513-9f94-6b53a9448677", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Hot This Week — recent activity" },
+    "backfillHygieneMissingGoals": { "id": "5e188c44-993c-4329-b34c-c033282b9f16", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Backfill Hygiene — missing Goals" },
+    "renewalWatchExpansion":   { "id": "5cd29c8c-dec1-471e-a2ac-e5ff912085d6", "objectType": "native_opportunity", "pipelineId": "edd86bbc-fd6c-4307-993f-6d1a6ba968aa", "title": "Renewal Watch (Expansion)" }
+  },
+  "skills": {
+    "weeklyDemoBriefing": {
+      "id": "71896ee2-6b88-4670-98f3-ae852bca19b3",
+      "slashCommand": "skill-e77669ad",
+      "triggerType": "SCHEDULE",
+      "triggerValue": "0 9 * * 1",
+      "timezone": "Asia/Kolkata",
+      "notificationType": ["email"],
+      "enabled": true
+    }
+  },
+  "users": {
+    "harsha": { "email": "harsha@ask-myra.ai", "userId": "e2a8d212-97cb-4d84-b76b-a9d7d7a1bcde" }
+  }
+}

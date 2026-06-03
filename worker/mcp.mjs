@@ -338,12 +338,13 @@ export function initializeServer(server) {
     'dayai_write',
     {
       description:
-        'Production Day AI write. action one of: org-link | org-create | opportunity-create | person-dedupe-check | person-create | action-create | draft-create | review-context. Requires AM approval upstream. Idempotency key reused on retry — never creates duplicates. Attributed to the signed-in AM. For review-context, the note body MUST be in payload.content (with a short payload.summary) — an empty body is rejected.',
+        'Production Day AI write. action one of: org-link | org-create | opportunity-create | opportunity-update-stage | person-dedupe-check | person-create | action-create | draft-create | review-context. Requires AM approval upstream. Idempotency key reused on retry — never creates duplicates. Attributed to the signed-in AM. For review-context, the note body MUST be in payload.content (with a short payload.summary) — an empty body is rejected. For opportunity-create, payload may include `stageId` (UUID from workspace-ids.json), `title`, `ownerEmail`, and `customProperties` (array of {propertyId, value, reasoning?} — picklist values must be option UUIDs, not display names). For opportunity-update-stage, payload requires `opportunityId` + `stageId`.',
       inputSchema: {
         action: z.enum([
           'org-link',
           'org-create',
           'opportunity-create',
+          'opportunity-update-stage',
           'person-dedupe-check',
           'person-create',
           'action-create',

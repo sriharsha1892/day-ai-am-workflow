@@ -128,6 +128,22 @@
         "active":  "10a75c28-cb37-47d8-8bce-df5197fe3b35",
         "archive": "fa9b4b72-1e29-464a-9f07-1e22e50b54a4"
       }
+    },
+    "contactAmAccountList": {
+      "id": "74b37205-157e-4555-9e83-354c585e0e2a",
+      "objectType": "native_contact",
+      "type": "picklist",
+      "mode": "manual",
+      "note": "Mirror of org-side AM Account List. Populated by apply-contact-am-tags.mjs (TODO) which inherits from each contact's member organization, OR by the worker contact-create handler going forward.",
+      "options": {
+        "satyaFocus": "d6f7d924-787d-457f-8f02-75cfea8f8038",
+        "satya":      "d6e6347b-0eb3-4d26-b2a2-8a5e4b922759",
+        "satish":     "a38f5245-3c54-43e1-aa4b-7f78ceaa947e",
+        "sudeshana":  "1dae768b-d1c3-4dcb-8b8e-9a7c0497ac72",
+        "kirandeep":  "f8438510-7b51-4d92-bed0-f696afb9294c",
+        "vijay":      "8a53df4c-bc0a-40b0-8f83-a2d2adb8e1da",
+        "nikita":     "c23f7666-5de3-436d-b2c1-f5be6ea3b3f6"
+      }
     }
   },
   "emailTemplates": {

@@ -64,6 +64,7 @@
     },
     "amOwnerSource": {
       "id": "3bef92dd-a429-4f2a-b72c-8dc01e37473f",
+      "objectType": "native_opportunity",
       "type": "picklist",
       "options": {
         "harsha":     "55ac4794-41f0-4cd8-8bc0-208d2bf0d953",
@@ -73,6 +74,59 @@
         "kirandeep":  "125c4fb6-f9ca-47a6-aec5-3841d593017c",
         "vijay":      "a1afcb34-3d0e-408f-8fb6-4678e7db4d16",
         "nikita":     "b559627c-6829-4b86-94a0-23dd28bcb3a3"
+      }
+    },
+    "amAccountList": {
+      "id": "99e4e13f-6642-4568-a340-a41a78f1254b",
+      "objectType": "native_organization",
+      "type": "picklist",
+      "mode": "manual",
+      "options": {
+        "satyaFocus": "37d0137f-e076-448c-ab6a-72cd0f3c69df",
+        "satya":      "079ddbe7-d542-49de-95ab-850453f723cd",
+        "satish":     "e0fb75b3-16d3-4368-aa76-def7603f3a87",
+        "sudeshana":  "21786f22-15d7-4f85-8a38-6c23ded94544",
+        "kirandeep":  "25b0309f-d91b-4c91-9527-4e3338d9e95b",
+        "vijay":      "23b9ff5d-2a05-4a1e-b962-10cf437eaf10",
+        "nikita":     "bc616325-99f9-437d-8193-1faa926947d1"
+      }
+    },
+    "accountStatus": {
+      "id": "36ae4d10-0284-441c-8932-0083c6737448",
+      "objectType": "native_organization",
+      "type": "picklist",
+      "mode": "manual",
+      "options": {
+        "active":     "a0e612df-5098-47df-8d22-e76f58c37b0c",
+        "researched": "1ba1decb-6252-446e-867a-92e252e7dc45",
+        "trial":      "cd2e2599-7ce5-42ce-8858-4e5fdf9b4a5d",
+        "customer":   "a87f9e89-d477-4c65-8df3-61c0814caf01",
+        "lost":       "caceea47-4f49-4ce5-92bb-e43eb4b17367",
+        "archive":    "0418543d-1248-4994-b2d5-187ead65785c"
+      }
+    },
+    "vertical": {
+      "id": "26fbee3d-b684-448a-bb1d-39e9e1530890",
+      "objectType": "native_organization",
+      "type": "picklist",
+      "mode": "aiManaged-useWeb",
+      "options": {
+        "specialtyChemicals":           "a1efad2b-b5ac-4ce8-9ec8-02a6bba9a6e5",
+        "foodIngredientsAgriFood":      "4efe0088-ed00-4b45-958a-2476ad3d3296",
+        "industrialManufacturing":      "11b9dbda-32be-4a58-8f5e-14ccac67a205",
+        "packagingAndMaterials":        "a6e91afb-4baa-4d0d-93a2-55cb09d97582",
+        "agribusinessCommodityTrading": "afe802e0-babf-44d9-8644-c398dc38052c",
+        "other":                        "056816f1-5e5d-40cb-bfc8-65c60922d10c"
+      }
+    },
+    "contactStatus": {
+      "id": "ab42b754-25e9-4aaa-85f4-7e932acc2871",
+      "objectType": "native_contact",
+      "type": "picklist",
+      "mode": "manual",
+      "options": {
+        "active":  "10a75c28-cb37-47d8-8bce-df5197fe3b35",
+        "archive": "fa9b4b72-1e29-464a-9f07-1e22e50b54a4"
       }
     }
   },
@@ -91,7 +145,12 @@
     "trialActiveNeedsAttention": { "id": "28670a7e-1d55-49cc-8f28-966ead540250", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Trial Active — needs attention" },
     "hotThisWeek":             { "id": "f545a23b-a334-4513-9f94-6b53a9448677", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Hot This Week — recent activity" },
     "backfillHygieneMissingGoals": { "id": "5e188c44-993c-4329-b34c-c033282b9f16", "objectType": "native_opportunity", "pipelineId": "d5cecc36-4757-4e60-8d66-900ef7a475af", "title": "Backfill Hygiene — missing Goals" },
-    "renewalWatchExpansion":   { "id": "5cd29c8c-dec1-471e-a2ac-e5ff912085d6", "objectType": "native_opportunity", "pipelineId": "edd86bbc-fd6c-4307-993f-6d1a6ba968aa", "title": "Renewal Watch (Expansion)" }
+    "renewalWatchExpansion":   { "id": "5cd29c8c-dec1-471e-a2ac-e5ff912085d6", "objectType": "native_opportunity", "pipelineId": "edd86bbc-fd6c-4307-993f-6d1a6ba968aa", "title": "Renewal Watch (Expansion)" },
+    "myAccountsByAm":          { "id": "a8bab1f8-b345-4402-8ca1-da67f84c2c0a", "objectType": "native_organization", "title": "My Accounts (by AM)" },
+    "byVertical":              { "id": "c2bb3e48-cdb2-4ee1-be06-4dbea62002a3", "objectType": "native_organization", "title": "By Vertical" },
+    "activeAccounts":          { "id": "2ff51d23-0e5c-4784-bce1-1608ec43ae3e", "objectType": "native_organization", "title": "Active Accounts" },
+    "unassignedNeedsOwner":    { "id": "5529daec-cdbb-4870-b729-4b709450a72c", "objectType": "native_organization", "title": "Unassigned — needs owner" },
+    "archiveReview":           { "id": "fdfed26b-5cfe-46ee-b78d-fea3c9179dd2", "objectType": "native_organization", "title": "Archive review" }
   },
   "skills": {
     "weeklyDemoBriefing": {

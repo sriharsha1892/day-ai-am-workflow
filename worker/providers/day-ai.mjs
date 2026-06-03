@@ -254,18 +254,74 @@ export const WRITE_HANDLERS = {
   },
   'org-create': {
     tool: 'create_or_update_person_organization',
-    args: (p) => ({
-      isCreating: true,
-      objectType: 'native_organization', // live enum is native_organization|native_contact (NOT 'Organization')
-      objectId: p.canonicalDomain,
-      standardProperties: { domain: p.canonicalDomain, name: p.accountName ?? p.canonicalDomain },
-    }),
+    args: (p) => {
+      const out = {
+        isCreating: true,
+        objectType: 'native_organization', // live enum is native_organization|native_contact (NOT 'Organization')
+        objectId: p.canonicalDomain,
+        standardProperties: { domain: p.canonicalDomain, name: p.accountName ?? p.canonicalDomain },
+      };
+      // Pass-through custom properties (e.g., AM Account List option UUID at creation).
+      // Caller resolves option UUIDs from templates/day-ai-workspace-ids.json. Shape per Day.ai MCP:
+      //   [{ propertyId: "uuid", value: <string|number|boolean|array|null>, reasoning?: "..." }]
+      if (Array.isArray(p.customProperties) && p.customProperties.length) {
+        out.customProperties = p.customProperties;
+      }
+      return out;
+    },
     type: 'organization',
     // objectId is deterministically the domain — the write response need not echo it.
     extractRecord: (parsed, p) => ({
       id: p.canonicalDomain,
       name: p.accountName ?? parsed?.title ?? p.canonicalDomain,
       link: orgLink(p.canonicalDomain),
+    }),
+  },
+  'org-update-tags': {
+    // Admin-scope: update an EXISTING org's custom properties only (e.g., AM Account List,
+    // Account Status, Vertical). Used by W4 cleanup scripts. Not exposed via the dayai_write
+    // MCP tool by default — admin scripts invoke via the same dispatcher.
+    tool: 'create_or_update_person_organization',
+    args: (p) => {
+      if (!p.canonicalDomain) throw new Error('org-update-tags requires canonicalDomain');
+      if (!Array.isArray(p.customProperties) || !p.customProperties.length) {
+        throw new Error('org-update-tags requires non-empty customProperties array');
+      }
+      return {
+        isCreating: false,
+        objectType: 'native_organization',
+        objectId: p.canonicalDomain,
+        customProperties: p.customProperties,
+      };
+    },
+    type: 'organization',
+    extractRecord: (_parsed, p) => ({
+      id: p.canonicalDomain,
+      name: p.canonicalDomain,
+      link: orgLink(p.canonicalDomain),
+    }),
+  },
+  'contact-update-tags': {
+    // Admin-scope: update an EXISTING contact's custom properties only (e.g., Contact Status).
+    // Used by W4 cleanup scripts. Contact objectId is the email address.
+    tool: 'create_or_update_person_organization',
+    args: (p) => {
+      if (!p.contactEmail) throw new Error('contact-update-tags requires contactEmail');
+      if (!Array.isArray(p.customProperties) || !p.customProperties.length) {
+        throw new Error('contact-update-tags requires non-empty customProperties array');
+      }
+      return {
+        isCreating: false,
+        objectType: 'native_contact',
+        objectId: p.contactEmail,
+        customProperties: p.customProperties,
+      };
+    },
+    type: 'person',
+    extractRecord: (_parsed, p) => ({
+      id: p.contactEmail,
+      name: p.contactEmail,
+      link: `${baseUrl()}/people/${encodeURIComponent(p.contactEmail)}`,
     }),
   },
   'opportunity-create': {

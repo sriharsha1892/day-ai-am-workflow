@@ -1,0 +1,30 @@
+{
+  "_comment": "Curated dedup clusters for W4-4C. Each cluster declares one canonical domain and >=1 aliases. The dedup-orgs.mjs script applies Day.ai's native canonical/alias relationships — aliases stay in the workspace (no data loss) but views auto-collapse to the canonical. Pre-seeded from the 2026-06-03 audit. Add new clusters as the org-hygiene runbook surfaces them.",
+  "clusters": [
+    {
+      "canonical": "constantiaflexibles.com",
+      "aliases": ["cflex.com", "constantia-flexibles.com"],
+      "reason": "typo + variant domain"
+    },
+    {
+      "canonical": "smurfitwestrock.com",
+      "aliases": ["smurfitwesterock.com"],
+      "reason": "typo"
+    },
+    {
+      "canonical": "mondelezinternational.com",
+      "aliases": ["mdlz.com"],
+      "reason": "ticker domain variant"
+    },
+    {
+      "canonical": "welspun.com",
+      "aliases": ["welspuncorp.com"],
+      "reason": "parent + subsidiary (Welspun group)"
+    },
+    {
+      "canonical": "airliquide.com",
+      "aliases": ["airgas.com"],
+      "reason": "parent + acquired subsidiary (Air Liquide / Airgas)"
+    }
+  ]
+}

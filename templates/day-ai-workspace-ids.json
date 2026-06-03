@@ -150,7 +150,8 @@
     "byVertical":              { "id": "c2bb3e48-cdb2-4ee1-be06-4dbea62002a3", "objectType": "native_organization", "title": "By Vertical" },
     "activeAccounts":          { "id": "2ff51d23-0e5c-4784-bce1-1608ec43ae3e", "objectType": "native_organization", "title": "Active Accounts" },
     "unassignedNeedsOwner":    { "id": "5529daec-cdbb-4870-b729-4b709450a72c", "objectType": "native_organization", "title": "Unassigned — needs owner" },
-    "archiveReview":           { "id": "fdfed26b-5cfe-46ee-b78d-fea3c9179dd2", "objectType": "native_organization", "title": "Archive review" }
+    "archiveReview":           { "id": "fdfed26b-5cfe-46ee-b78d-fea3c9179dd2", "objectType": "native_organization", "title": "Archive review" },
+    "activePeopleByOrgDomain": { "id": "e013318f-4b10-41b0-a2a6-e93f1cc094fe", "objectType": "native_contact", "title": "Active People (by org domain)" }
   },
   "skills": {
     "weeklyDemoBriefing": {

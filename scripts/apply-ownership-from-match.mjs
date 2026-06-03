@@ -26,7 +26,9 @@ import { buildIdempotencyKey, callWorker, canonicalDomain, parseArgs } from './w
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
-const MATCH_CSV = path.join(REPO_ROOT, 'templates', 'org-cleanup-reports', 'cull-matched-to-master.csv');
+const MATCH_CSV = process.argv.find((a) => a.startsWith('--csv='))?.split('=')[1]
+  ? path.resolve(process.argv.find((a) => a.startsWith('--csv=')).split('=')[1])
+  : path.join(REPO_ROOT, 'templates', 'org-cleanup-reports', 'cull-matched-to-master.csv');
 const MASTER_CSV = path.join(REPO_ROOT, 'templates', 'master-account-list.csv');
 const IDS_PATH = path.join(REPO_ROOT, 'templates', 'day-ai-workspace-ids.json');
 

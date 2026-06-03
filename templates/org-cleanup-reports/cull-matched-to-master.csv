@@ -1,0 +1,112 @@
+domain,name,match_type,master_account_name
+abb.com,ABB,exact,ABB
+adnoc.ae,ADNOC,exact,ADNOC
+adq.ae,ADQ,exact,ADQ
+apwinner.com.br,APWinner,exact,APWinner
+assaabloy.com,ASSA ABLOY,exact,ASSA ABLOY
+aarti-industries.com,aarti-industries.com,substring,Aarti Industries Limited (AIL)-India
+abbott.com,Abbott,exact,Abbott
+adia.ae,Abu Dhabi Investment Authority,exact,Abu Dhabi Investment Authority
+adityabirla.com,Aditya Birla Group,exact,Aditya Birla Group
+airliquide.com,Air Liquide,exact,Air Liquide / Airgas
+alfuttaim.com,Al-Futtaim,exact,Al-Futtaim Group
+alixpartners.com,AlixPartners,exact,AlixPartners
+almarai.com,Almarai,exact,Almarai Company
+ametek.com,Ametek,exact,Ametek
+avendus.com,Avendus Capital,exact,Avendus Capital
+basf.com,BASF,substring,BASF SE
+bain.com,Bain & Company,exact,"Bain & Company, Inc. (Consulting)"
+saint-gobain.com,Saint-Gobain,substring,"Bain & Company, Inc. (Consulting)"
+bayer.com,Bayer,exact,Bayer AG
+blum.com,Blum,exact,Blum
+arkema.com,Arkema,substring,Bostik- Arkema
+bostik.com,Bostik,substring,Bostik- Arkema
+buhlergroup.com,Bühler Group,exact,Buhler Group
+crisil.com,CRISIL,exact,CRISIL Limited (S&P Global Subsidiary)
+cargill.com,Cargill,exact,Cargill
+constantia-flexibles.com,constantia-flexibles.com,substring,Constantia Flexibles
+constantiaflexibles.com,Constantia Flexibles,exact,Constantia Flexibles
+cflex.com,Constantia Flexibles,exact,Constantia Flexibles
+corteva.com,Corteva Agriscience,substring,Corteva
+danaher.com,Danaher,exact,Danaher
+darlingii.com,Darling Ingredients,exact,Darling Ingredients
+drreddys.com,Dr. Reddy's Laboratories,exact,Dr. Reddy's Laboratories Ltd.
+dubaiinvestments.com,Dubai Investments PJSC,exact,Dubai Investments PJSC
+eastretailing.com,East Retailing,exact,East Retailing
+eaton.com,Eaton,exact,Eaton
+evonik.com,Evonik Industries,substring,Evonik
+exxonmobil.com,ExxonMobil,exact,ExxonMobil
+fondsftq.com,Fonds de solidarité FTQ,tokens-2plus,FONDS FTQ
+godrejenterprises.com,Godrej Enterprises Group,exact,Godrej Enterprises Group
+godrej.com,Godrej Group,substring,Godrej Enterprises Group
+lactalis.com,Lactalis,substring,Groupe Lactalis
+hager.com,Hager Group,exact,Hager
+henkel.com,Henkel,exact,Henkel
+jp.honda,"Honda Motor Co., Ltd.",substring,Honda
+honeywell.com,Honeywell,exact,Honeywell
+horwathhtl.com,Horwath HTL,substring,Horwath
+iffco.in,IFFCO Group,exact,IFFCO Group
+iffco.com,iffco.com,substring,IFFCO Group
+ikea.com,IKEA,exact,IKEA
+ineos.com,INEOS Group,exact,INEOS Group
+ipsos.com,Ipsos,exact,IPSOS
+itc.in,ITC Limited,exact,ITC Limited
+itw.com,ITW / Illinois Tool Works,exact,ITW / Illinois Tool Works
+iisc.ac.in,Indian Institute of Science,exact,Indian Institute of Science (IISc)
+ingredion.com,Ingredion,substring,Ingredion Incorporated
+jll.com,JLL,exact,JLL
+jadwa.com.sa,Jadwa Investment,exact,Jadwa Investment
+klcc.com.my,klcc.com.my,substring,KLCC Group
+kalyanimotive.com,Kalyani Motive,substring,Kalyani Group
+kalyanisteels.com,Kalyani Steels,substring,Kalyani Group
+koerber.com,koerber.com,substring,Koerber
+kuehne-nagel.com,Kuehne+Nagel,exact,Kuehne+Nagel
+landolakes.com,Land O'Lakes,exact,Land O'Lakes
+liebherr.com,Liebherr Group,exact,Liebherr Group
+mufg.jp,MUFG,exact,MUFG
+mahindra.com,Mahindra Group,substring,Mahindra Group Family Conglomerate
+mcgc.com,Mitsubishi Chemical Group,exact,Mitsubishi Chemical Group
+mitsuichem.com,Mitsui Chemicals,substring,Mitsui Group
+mondelezinternational.com,Mondelēz International,exact,Mondelez International
+mdlz.com,Mondelēz International,exact,Mondelez International
+murugappa.com,Murugappa Group,exact,Murugappa Group
+nestle.com,Nestlé,substring,Nestle S.A. (Food & Beverage)
+nokia.com,nokia.com,substring,Nokia
+novonesis.com,Novonesis,substring,Novonesis A/S
+nov.com,NOV,substring,Novonesis A/S
+ofsu.com,OFSUs,exact,OFSUs
+paconsulting.com,PA Consulting,exact,PA Consulting Group
+petronas.com,PETRONAS,exact,Petronas
+pli-petronas.com,PETRONAS Lubricants International,substring,Petronas
+praxisga.com,Praxis Global Alliance,exact,Praxis Global Alliance
+praxis-ga.com,Praxis Global Alliance,exact,Praxis Global Alliance
+co-ro.com,CO-RO,substring,Protiviti
+protiviti.com,Protiviti,exact,Protiviti
+qiddiya.sa,Qiddiya,exact,Qiddiya
+qiddiya.com,qiddiya.com,substring,Qiddiya
+ril.com,Reliance Industries Limited,exact,Reliance Industries Limited
+roche.com,Roche,exact,Roche
+srg.com,SRG,exact,SRG
+sabic-europe.com,SABIC (SABIC Europe / SABIC Europe B.V.),exact,Sabic
+sabic.com,SABIC,exact,Sabic
+sabic-ip.com,SABIC Innovative Plastics,substring,Sabic
+sandia.gov,Sandia National Laboratories,exact,Sandia National Laboratories
+aramco.com,Saudi Aramco,exact,Saudi Aramco
+se.com,Schneider Electric,exact,Schneider Electric
+shell.com,Shell,exact,Shell plc (Energy)
+sherwin.com,Sherwin-Williams,exact,Sherwin-Williams
+siemens.com,Siemens,exact,Siemens
+siemens-healthineers.com,Siemens Healthineers,substring,Siemens
+smurfitwestrock.com,Smurfit Westrock,exact,Smurfit Westrock
+solvay.com,Solvay,exact,Solvay
+tdk.com,TDK,exact,TDK
+tuv-sud.com,TUV SUD,exact,TUV SUD
+tcs.com,Tata Consultancy Services,substring,Tata Group
+tatasteel.com,Tata Steel,substring,Tata Group
+ultratechcement.com,UltraTech,exact,UltraTech
+wacker.com,Wacker Chemie AG,substring,Wacker
+welspun.com,Welspun World (Welspun Corp),substring,Welspun Corp
+welspuncorp.com,Welspun Corp,exact,Welspun Corp
+ycp.com,YCP Holdings (Global) Limited,substring,YCP Solidiance
+zoppas.com,Zoppas Industries Heating Element Technologies,exact,Zoppas Industries Heating Element Technologies
+dsm-firmenich.com,DSM-Firmenich,exact,dsm-firmenich AG (APAC)
